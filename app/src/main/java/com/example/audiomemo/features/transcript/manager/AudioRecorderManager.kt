@@ -1,0 +1,157 @@
+package com.example.audiomemo.features.transcript.manager
+
+import android.content.Context
+import android.media.MediaRecorder
+import android.os.Build
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class AudioRecorderManager(private val context: Context) {
+
+    private var mediaRecorder: MediaRecorder? = null
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+    private var amplitudeJob: Job? = null
+    private var chunkJob: Job? = null
+
+    private val _amplitude = MutableStateFlow(0)
+    val amplitude: StateFlow<Int> = _amplitude.asStateFlow()
+
+    private val _lastChunkFile = MutableStateFlow<File?>(null)
+    val lastChunkFile: StateFlow<File?> = _lastChunkFile.asStateFlow()
+
+    private var currentOutputFile: File? = null
+
+    /** Called whenever a 30-second chunk is completed (rotation or pause/stop). */
+    var onChunkCompleted: ((File) -> Unit)? = null
+
+    /** Called when storage drops below the minimum threshold during recording. */
+    var onStorageLow: (() -> Unit)? = null
+
+    // ── Public API ─────────────────────────────────────────────────────────────
+
+    fun startRecording() {
+        if (!StorageGuard.hasEnoughStorage(context.filesDir)) {
+            onStorageLow?.invoke()
+            return
+        }
+        startNewChunk()
+        startMonitoringJobs()
+    }
+
+    fun pauseRecording() {
+        cancelMonitoringJobs()
+        finaliseCurrentChunk(label = "paused")
+        _amplitude.value = 0
+    }
+
+    fun resumeRecording() {
+        if (!StorageGuard.hasEnoughStorage(context.filesDir)) {
+            onStorageLow?.invoke()
+            return
+        }
+        startNewChunk()
+        startMonitoringJobs()
+    }
+
+    fun stopRecording() {
+        cancelMonitoringJobs()
+        finaliseCurrentChunk(label = "final")
+        _amplitude.value = 0
+    }
+
+    // ── Internals ──────────────────────────────────────────────────────────────
+
+    private fun startMonitoringJobs() {
+        amplitudeJob = scope.launch {
+            while (isActive) {
+                _amplitude.value = try {
+                    mediaRecorder?.maxAmplitude ?: 0
+                } catch (_: RuntimeException) {
+                    0
+                }
+                delay(100)
+            }
+        }
+        chunkJob = scope.launch {
+            while (isActive) {
+                delay(30_000)
+                if (!isActive) break
+                if (!StorageGuard.hasEnoughStorage(context.filesDir)) {
+                    onStorageLow?.invoke()
+                    break
+                }
+                startNewChunk()
+            }
+        }
+    }
+
+    private fun cancelMonitoringJobs() {
+        amplitudeJob?.cancel()
+        chunkJob?.cancel()
+        amplitudeJob = null
+        chunkJob = null
+    }
+
+    private fun startNewChunk() {
+        finaliseCurrentChunk(label = "chunk")
+
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        currentOutputFile = File(context.filesDir, "audio_chunk_$timestamp.m4a")
+
+        mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        }.apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            setOutputFile(currentOutputFile?.absolutePath)
+            try {
+                prepare()
+                start()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun finaliseCurrentChunk(label: String) {
+        val completed = currentOutputFile
+        stopMediaRecorder()
+        if (completed != null && completed.length() > 0) {
+            Log.d("AudioRecorderManager", "$label chunk saved: ${completed.absolutePath} (${completed.length()} bytes)")
+            _lastChunkFile.value = completed
+            onChunkCompleted?.invoke(completed)
+        }
+        currentOutputFile = null
+    }
+
+    private fun stopMediaRecorder() {
+        val recorder = mediaRecorder
+        mediaRecorder = null
+        recorder?.apply {
+            try {
+                stop()
+                reset()
+                release()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+}

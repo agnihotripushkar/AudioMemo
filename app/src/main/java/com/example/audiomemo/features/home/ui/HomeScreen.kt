@@ -1,0 +1,570 @@
+package com.example.audiomemo.features.home.ui
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.annotation.StringRes
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.audiomemo.R
+import com.example.audiomemo.features.meetings.ui.MeetingListItem
+import com.example.audiomemo.features.summary.domain.model.SummaryStatus
+import com.example.audiomemo.features.transcript.domain.model.SessionState
+import com.example.audiomemo.ui.theme.AccentGreen
+import com.example.audiomemo.ui.theme.AudioMemoTheme
+import com.example.audiomemo.ui.theme.DividerColor
+import com.example.audiomemo.ui.theme.TextSecondary
+import com.example.audiomemo.ui.theme.TextTertiary
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@Composable
+fun HomeScreen(
+    onNavigateToTranscript: () -> Unit,
+    onNavigateToMeetings: () -> Unit = {},
+    onNavigateToMeetingDetails: (Long) -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel()
+) {
+    val context = LocalContext.current
+    var permissionDeniedMessage by remember { mutableStateOf<String?>(null) }
+    val recentMeetings by viewModel.recentMeetings.collectAsStateWithLifecycle()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.RECORD_AUDIO] == true) {
+            permissionDeniedMessage = null
+            onNavigateToTranscript()
+        } else {
+            permissionDeniedMessage = context.getString(R.string.home_mic_permission_denied)
+        }
+    }
+
+    HomeContent(
+        recentMeetings = recentMeetings,
+        permissionDeniedMessage = permissionDeniedMessage,
+        onNavigateToMeetings = onNavigateToMeetings,
+        onMeetingClick = onNavigateToMeetingDetails,
+        onCaptureClick = {
+            val hasAudio = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasAudio) {
+                onNavigateToTranscript()
+            } else {
+                val perms = buildList {
+                    add(Manifest.permission.RECORD_AUDIO)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        add(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }.toTypedArray()
+                permissionLauncher.launch(perms)
+            }
+        }
+    )
+}
+
+@Composable
+fun HomeContent(
+    recentMeetings: List<MeetingListItem>,
+    permissionDeniedMessage: String?,
+    onNavigateToMeetings: () -> Unit,
+    onMeetingClick: (Long) -> Unit,
+    onCaptureClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Top bar
+        HomeTopBar(modifier = Modifier.statusBarsPadding())
+
+        HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+
+        // Scrollable body
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            // Record button hero
+            item {
+                RecordButtonSection(
+                    onCaptureClick = onCaptureClick,
+                    permissionDeniedMessage = permissionDeniedMessage
+                )
+            }
+
+            // Recent recordings header
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_recent_recordings),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextSecondary
+                    )
+                    if (recentMeetings.isNotEmpty()) {
+                        Text(
+                            text = stringResource(R.string.home_view_all),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AccentGreen,
+                            modifier = Modifier.clickable { onNavigateToMeetings() }
+                        )
+                    }
+                }
+            }
+
+            // Recording cards or empty state
+            if (recentMeetings.isEmpty()) {
+                item { EmptyRecordingsState() }
+            } else {
+                items(recentMeetings, key = { it.sessionId }) { meeting ->
+                    RecordingCard(
+                        meeting = meeting,
+                        onClick = { onMeetingClick(meeting.sessionId) }
+                    )
+                }
+            }
+        }
+
+        // Bottom nav bar
+        HomeBottomNavBar(onMeetingsClick = onNavigateToMeetings)
+    }
+}
+
+// ── Top bar ───────────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeTopBar(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        IconButton(onClick = {}) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = stringResource(R.string.cd_settings),
+                tint = TextSecondary
+            )
+        }
+    }
+}
+
+// ── Record button ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun RecordButtonSection(
+    onCaptureClick: () -> Unit,
+    permissionDeniedMessage: String?
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Animated pulse ring + button
+        val infiniteTransition = rememberInfiniteTransition(label = "recordPulse")
+        val pulseAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0f,
+            animationSpec = InfiniteRepeatableSpec(
+                animation = tween(1400, easing = EaseOut),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "pulseAlpha"
+        )
+        val pulseScale by infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.55f,
+            animationSpec = InfiniteRepeatableSpec(
+                animation = tween(1400, easing = EaseOut),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "pulseScale"
+        )
+
+        Box(contentAlignment = Alignment.Center) {
+            // Outer pulse ring
+            Canvas(modifier = Modifier.size(140.dp)) {
+                drawCircle(
+                    color = AccentGreen.copy(alpha = pulseAlpha),
+                    radius = (size.minDimension / 2f) * pulseScale
+                )
+            }
+
+            // Record button
+            Surface(
+                shape = CircleShape,
+                color = AccentGreen,
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .size(88.dp)
+                    .clickable(onClick = onCaptureClick)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = stringResource(R.string.cd_record),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = stringResource(R.string.home_tap_to_record),
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextSecondary
+        )
+
+        // Permission denied message
+        if (permissionDeniedMessage != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = permissionDeniedMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+        }
+    }
+}
+
+// ── Recording card ────────────────────────────────────────────────────────────
+
+@Composable
+private fun RecordingCard(
+    meeting: MeetingListItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 5.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Mic icon badge
+            Surface(
+                shape = CircleShape,
+                color = AccentGreen.copy(alpha = 0.15f),
+                modifier = Modifier.size(42.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq,
+                        contentDescription = null,
+                        tint = AccentGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            // Title + meta
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = meeting.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = formatDate(meeting.startTime),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary
+                    )
+                    Text(
+                        text = formatDuration(meeting.durationMs),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary
+                    )
+                }
+            }
+
+            // Status badge + chevron
+            Column(horizontalAlignment = Alignment.End) {
+                SummaryStatusBadge(status = meeting.summaryStatus)
+                Spacer(modifier = Modifier.height(4.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryStatusBadge(status: SummaryStatus?) {
+    val (labelRes, color) = when (status) {
+        SummaryStatus.DONE       -> R.string.home_status_summarized to AccentGreen
+        SummaryStatus.GENERATING -> R.string.home_status_processing to MaterialTheme.colorScheme.tertiary
+        SummaryStatus.FAILED     -> R.string.home_status_failed     to MaterialTheme.colorScheme.error
+        else                     -> return
+    }
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = color.copy(alpha = 0.15f)
+    ) {
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+    }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun EmptyRecordingsState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.size(64.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = null,
+                    tint = TextTertiary,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+        }
+        Text(
+            text = stringResource(R.string.home_no_recordings_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = TextSecondary
+        )
+        Text(
+            text = stringResource(R.string.home_no_recordings_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = TextTertiary
+        )
+    }
+}
+
+// ── Bottom nav bar ────────────────────────────────────────────────────────────
+
+private enum class HomeTab(@StringRes val labelRes: Int, val icon: ImageVector) {
+    Home(R.string.nav_tab_home, Icons.Default.Home),
+    Meetings(R.string.nav_tab_meetings, Icons.Default.MeetingRoom),
+    Settings(R.string.nav_tab_settings, Icons.Default.Settings)
+}
+
+@Composable
+private fun HomeBottomNavBar(onMeetingsClick: () -> Unit) {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        modifier = Modifier.navigationBarsPadding()
+    ) {
+        HomeTab.entries.forEach { tab ->
+            val selected = tab == HomeTab.Home
+            NavigationBarItem(
+                selected = selected,
+                onClick = {
+                    when (tab) {
+                        HomeTab.Meetings -> onMeetingsClick()
+                        else -> { /* Home = current, Settings = future */ }
+                    }
+                },
+                icon = {
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = stringResource(tab.labelRes),
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = stringResource(tab.labelRes),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = AccentGreen,
+                    selectedTextColor = AccentGreen,
+                    unselectedIconColor = TextTertiary,
+                    unselectedTextColor = TextTertiary,
+                    indicatorColor = AccentGreen.copy(alpha = 0.12f)
+                )
+            )
+        }
+    }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+private fun formatDate(millis: Long): String =
+    SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(millis))
+
+private fun formatDuration(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenPreview() {
+    AudioMemoTheme {
+        HomeContent(
+            recentMeetings = listOf(
+                MeetingListItem(
+                    sessionId = 1L,
+                    title = "Team Standup – Sprint Review",
+                    startTime = System.currentTimeMillis() - 3_600_000,
+                    durationMs = 15 * 60 * 1000L,
+                    sessionState = SessionState.STOPPED,
+                    summaryStatus = SummaryStatus.DONE
+                ),
+                MeetingListItem(
+                    sessionId = 2L,
+                    title = "Product Roadmap Discussion",
+                    startTime = System.currentTimeMillis() - 86_400_000,
+                    durationMs = 45 * 60 * 1000L,
+                    sessionState = SessionState.STOPPED,
+                    summaryStatus = SummaryStatus.GENERATING
+                )
+            ),
+            permissionDeniedMessage = null,
+            onNavigateToMeetings = {},
+            onMeetingClick = {},
+            onCaptureClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenEmptyPreview() {
+    AudioMemoTheme {
+        HomeContent(
+            recentMeetings = emptyList(),
+            permissionDeniedMessage = null,
+            onNavigateToMeetings = {},
+            onMeetingClick = {},
+            onCaptureClick = {}
+        )
+    }
+}
