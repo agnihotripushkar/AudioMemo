@@ -18,7 +18,7 @@
     <string name="home_capture_notes">Capture Notes</string>
     <string name="home_mic_permission_denied">Microphone permission is required to record audio.</string>
     <string name="home_tap_to_record">Tap to Record</string>
-    <string name="home_recent_recordings">Recent Recordings</string>
+    <string name="home_recent">Recent</string>
     <string name="home_view_all">View all</string>
     <string name="home_no_recordings_title">No recordings yet</string>
     <string name="home_no_recordings_body">Tap the button above to start your first recording</string>

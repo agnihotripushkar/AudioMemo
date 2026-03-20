@@ -14,7 +14,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,16 +54,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,8 +87,13 @@ import com.example.audiomemo.features.meetings.ui.MeetingListItem
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.transcript.domain.model.SessionState
 import com.example.audiomemo.ui.theme.AccentGreen
+import com.example.audiomemo.ui.theme.AccentGreenDark
+import com.example.audiomemo.ui.theme.AccentGreenLight
 import com.example.audiomemo.ui.theme.AudioMemoTheme
 import com.example.audiomemo.ui.theme.DividerColor
+import com.example.audiomemo.ui.theme.HeroSkyMid
+import com.example.audiomemo.ui.theme.NavyBackground
+import com.example.audiomemo.ui.theme.TextPrimary
 import com.example.audiomemo.ui.theme.TextSecondary
 import com.example.audiomemo.ui.theme.TextTertiary
 import java.text.SimpleDateFormat
@@ -128,6 +147,7 @@ fun HomeScreen(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeContent(
     recentMeetings: List<MeetingListItem>,
@@ -136,21 +156,38 @@ fun HomeContent(
     onMeetingClick: (Long) -> Unit,
     onCaptureClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // Top bar
-        HomeTopBar(modifier = Modifier.statusBarsPadding())
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "AudioMemo",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.headlineLarge
 
-        HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
-
-        // Scrollable body
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        bottomBar = {
+            HomeBottomNavBar(onMeetingsClick = onNavigateToMeetings)
+        }
+    ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(bottom = 24.dp)
-        ) {
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(NavyBackground)
+        )
+        {
+            // Top bar
+            //HomeTopBar(modifier = Modifier.statusBarsPadding())
+
+            //HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+
             // Record button hero
             item {
                 RecordButtonSection(
@@ -159,25 +196,29 @@ fun HomeContent(
                 )
             }
 
+            item {
+                TimerComponent()
+            }
+
             // Recent recordings header
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = stringResource(R.string.home_recent_recordings),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextSecondary
+                        text = stringResource(R.string.home_recent),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = TextPrimary
                     )
                     if (recentMeetings.isNotEmpty()) {
                         Text(
                             text = stringResource(R.string.home_view_all),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AccentGreen,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.clickable { onNavigateToMeetings() }
                         )
                     }
@@ -195,12 +236,60 @@ fun HomeContent(
                     )
                 }
             }
-        }
 
-        // Bottom nav bar
-        HomeBottomNavBar(onMeetingsClick = onNavigateToMeetings)
+        }
     }
 }
+
+@Composable
+private fun TimerComponent() {
+    val blink by rememberInfiniteTransition().animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "00:00:00",
+            modifier = Modifier.padding(bottom = 12.dp),
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontSize = 64.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Color.Red.copy(alpha = blink)
+                    )
+
+            )
+            Text(
+                text = "Tap To Record",
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+
+
+    }
+}
+
 
 // ── Top bar ───────────────────────────────────────────────────────────────────
 
@@ -236,80 +325,70 @@ private fun RecordButtonSection(
     onCaptureClick: () -> Unit,
     permissionDeniedMessage: String?
 ) {
-    Column(
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val sectionHeightPx = with(density) { 320.dp.toPx() }
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .height(320.dp)
+            .background(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF6D3FD4),              // vivid violet core
+                        Color(0xFF3B1F7A).copy(alpha = 0.8f), // mid purple
+                        Color(0xFF1A1040).copy(alpha = 0.5f), // soft fade
+                        NavyBackground.copy(alpha = 0f)
+                    ),
+                    center = Offset(
+                        screenWidthPx / 2f, sectionHeightPx / 2f
+                    ),
+                    radius = screenWidthPx * 0.72f
+                )
+            )
     ) {
-        // Animated pulse ring + button
-        val infiniteTransition = rememberInfiniteTransition(label = "recordPulse")
-        val pulseAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.35f,
-            targetValue = 0f,
-            animationSpec = InfiniteRepeatableSpec(
-                animation = tween(1400, easing = EaseOut),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "pulseAlpha"
-        )
-        val pulseScale by infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.55f,
-            animationSpec = InfiniteRepeatableSpec(
-                animation = tween(1400, easing = EaseOut),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "pulseScale"
-        )
-
-        Box(contentAlignment = Alignment.Center) {
-            // Outer pulse ring
-            Canvas(modifier = Modifier.size(140.dp)) {
-                drawCircle(
-                    color = AccentGreen.copy(alpha = pulseAlpha),
-                    radius = (size.minDimension / 2f) * pulseScale
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(180.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                AccentGreenLight,   // #A78BFA — lighter center
+                                AccentGreen,        // #8B5CF6 — mid
+                                AccentGreenDark,    // #7C3AED — darker edge
+                            )
+                        )
+                    )
+                    .clickable(onClick = onCaptureClick)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = stringResource(R.string.cd_record),
+                    tint = Color.White,
+                    modifier = Modifier.size(64.dp)
                 )
             }
 
-            // Record button
-            Surface(
-                shape = CircleShape,
-                color = AccentGreen,
-                shadowElevation = 8.dp,
-                modifier = Modifier
-                    .size(88.dp)
-                    .clickable(onClick = onCaptureClick)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = stringResource(R.string.cd_record),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
+            if (permissionDeniedMessage != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = permissionDeniedMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                )
             }
+
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = stringResource(R.string.home_tap_to_record),
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary
-        )
-
-        // Permission denied message
-        if (permissionDeniedMessage != null) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = permissionDeniedMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 32.dp)
-            )
-        }
     }
 }
 
@@ -404,10 +483,10 @@ private fun RecordingCard(
 @Composable
 private fun SummaryStatusBadge(status: SummaryStatus?) {
     val (labelRes, color) = when (status) {
-        SummaryStatus.DONE       -> R.string.home_status_summarized to AccentGreen
+        SummaryStatus.DONE -> R.string.home_status_summarized to AccentGreen
         SummaryStatus.GENERATING -> R.string.home_status_processing to MaterialTheme.colorScheme.tertiary
-        SummaryStatus.FAILED     -> R.string.home_status_failed     to MaterialTheme.colorScheme.error
-        else                     -> return
+        SummaryStatus.FAILED -> R.string.home_status_failed to MaterialTheme.colorScheme.error
+        else -> return
     }
     Surface(
         shape = RoundedCornerShape(50),
@@ -482,7 +561,8 @@ private fun HomeBottomNavBar(onMeetingsClick: () -> Unit) {
                 onClick = {
                     when (tab) {
                         HomeTab.Meetings -> onMeetingsClick()
-                        else -> { /* Home = current, Settings = future */ }
+                        else -> { /* Home = current, Settings = future */
+                        }
                     }
                 },
                 icon = {
