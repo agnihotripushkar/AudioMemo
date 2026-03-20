@@ -6,26 +6,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /**
- * AudioMemo dark color scheme.
+ * AudioMemo dark color scheme — Electric Violet (#8B5CF6) theme.
  *
  * Slot mapping:
- *   primary            → AccentGreen       (FABs, record button, active tab indicator)
- *   onPrimary          → TextPrimary       (text/icons on green surfaces)
+ *   primary            → AccentGreen       (FABs, record button, active tab indicator — Electric Violet)
+ *   onPrimary          → TextPrimary       (text/icons on violet surfaces)
  *   primaryContainer   → NavyElevated      (chip backgrounds, waveform container)
- *   onPrimaryContainer → AccentGreenLight  (icons inside primary containers)
+ *   onPrimaryContainer → AccentGreenLight  (icons inside primary containers — violet-400)
  *
- *   secondary          → AccentGreenDark   (secondary actions, outlined buttons tint)
+ *   secondary          → AccentGreenDark   (secondary actions, outlined buttons tint — violet-600)
  *   onSecondary        → TextPrimary
  *   secondaryContainer → NavyCard          (recording status card)
  *   onSecondaryContainer → TextSecondary
  *
- *   tertiary           → LegacyOrange      (accent highlights, "your memories" text)
+ *   tertiary           → LegacyOrange      (accent highlights — pink #F472B6)
  *   onTertiary         → TextPrimary
  *
- *   background         → NavyBackground    (all screen backgrounds)
+ *   background         → NavyBackground    (all screen backgrounds — deep indigo-black)
  *   onBackground       → TextPrimary
  *
- *   surface            → NavySurface       (cards, bottom sheets, top bars)
+ *   surface            → NavySurface       (cards, bottom sheets, top bars — dark indigo)
  *   onSurface          → TextPrimary
  *   surfaceVariant     → NavyElevated      (tab rows, divider background)
  *   onSurfaceVariant   → TextSecondary
