@@ -35,3 +35,16 @@ val LegacyDarkTeal    = Color(0xFF1A1235)   // was dark teal, now deep violet
 val LegacyOrange      = Color(0xFFF472B6)   // tertiary pink accent (from Electric Violet palette)
 val LegacyLightBlue   = Color(0xFFDDD6FE)   // was light blue, now light violet (violet-200)
 val LegacyPeach       = Color(0xFFF5F3FF)   // was peach, now lavender tint (violet-50)
+
+// ── Light Theme Palette (Sonic Fluid Light) ───────────────────────────────────
+val LightBackground        = Color(0xFFFFFBFE)   // airy white — M3 standard light bg
+val LightSurface           = Color(0xFFFFFFFF)   // pure white cards
+val LightSurfaceVariant    = Color(0xFFEDE8F5)   // light violet-tinted container
+val LightCard              = Color(0xFFF3EEF8)   // subtle violet-wash card tint
+val LightOnBackground      = Color(0xFF1C1035)   // deep violet-black primary text
+val LightOnSurface         = Color(0xFF1C1035)   // text on cards
+val LightOnSurfaceVariant  = Color(0xFF49454F)   // secondary text (gray-violet)
+val LightOutline           = Color(0xFF79747E)   // borders + tertiary text
+val LightOutlineVariant    = Color(0xFFCAC4D0)   // subtle dividers
+val LightPrimaryContainer  = Color(0xFFEADDFF)   // light violet chip / container bg
+val LightOnPrimaryContainer= Color(0xFF21005D)   // dark violet text on light container

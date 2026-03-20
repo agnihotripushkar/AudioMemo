@@ -2,6 +2,7 @@ package com.example.audiomemo.features.home.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -90,12 +91,6 @@ import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AccentGreenDark
 import com.example.audiomemo.ui.theme.AccentGreenLight
 import com.example.audiomemo.ui.theme.AudioMemoTheme
-import com.example.audiomemo.ui.theme.DividerColor
-import com.example.audiomemo.ui.theme.HeroSkyMid
-import com.example.audiomemo.ui.theme.NavyBackground
-import com.example.audiomemo.ui.theme.TextPrimary
-import com.example.audiomemo.ui.theme.TextSecondary
-import com.example.audiomemo.ui.theme.TextTertiary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -180,7 +175,7 @@ fun HomeContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(NavyBackground)
+                .background(MaterialTheme.colorScheme.background)
         )
         {
             // Top bar
@@ -212,7 +207,7 @@ fun HomeContent(
                     Text(
                         text = stringResource(R.string.home_recent),
                         style = MaterialTheme.typography.displayLarge,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     if (recentMeetings.isNotEmpty()) {
                         Text(
@@ -260,7 +255,7 @@ private fun TimerComponent() {
         Text(
             text = "00:00:00",
             modifier = Modifier.padding(bottom = 12.dp),
-            color = MaterialTheme.colorScheme.onPrimary,
+            color = MaterialTheme.colorScheme.primary,
             fontSize = 64.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -282,7 +277,7 @@ private fun TimerComponent() {
                 text = "Tap To Record",
                 modifier = Modifier.padding(start = 8.dp),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
 
@@ -312,7 +307,7 @@ private fun HomeTopBar(modifier: Modifier = Modifier) {
             Icon(
                 imageVector = Icons.Default.Settings,
                 contentDescription = stringResource(R.string.cd_settings),
-                tint = TextSecondary
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -329,6 +324,7 @@ private fun RecordButtonSection(
     val density = LocalDensity.current
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val sectionHeightPx = with(density) { 320.dp.toPx() }
+    val bgColor = MaterialTheme.colorScheme.background
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -340,7 +336,7 @@ private fun RecordButtonSection(
                         Color(0xFF6D3FD4),              // vivid violet core
                         Color(0xFF3B1F7A).copy(alpha = 0.8f), // mid purple
                         Color(0xFF1A1040).copy(alpha = 0.5f), // soft fade
-                        NavyBackground.copy(alpha = 0f)
+                        bgColor.copy(alpha = 0f)
                     ),
                     center = Offset(
                         screenWidthPx / 2f, sectionHeightPx / 2f
@@ -450,17 +446,17 @@ private fun RecordingCard(
                     Text(
                         text = formatDate(meeting.startTime),
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
+                        color = MaterialTheme.colorScheme.outline
                     )
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
+                        color = MaterialTheme.colorScheme.outline
                     )
                     Text(
                         text = formatDuration(meeting.durationMs),
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
@@ -472,7 +468,7 @@ private fun RecordingCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = TextTertiary,
+                    tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -521,7 +517,7 @@ private fun EmptyRecordingsState() {
                 Icon(
                     imageVector = Icons.Default.Mic,
                     contentDescription = null,
-                    tint = TextTertiary,
+                    tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -529,12 +525,12 @@ private fun EmptyRecordingsState() {
         Text(
             text = stringResource(R.string.home_no_recordings_title),
             style = MaterialTheme.typography.titleSmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = stringResource(R.string.home_no_recordings_body),
             style = MaterialTheme.typography.bodySmall,
-            color = TextTertiary
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
@@ -581,8 +577,8 @@ private fun HomeBottomNavBar(onMeetingsClick: () -> Unit) {
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = AccentGreen,
                     selectedTextColor = AccentGreen,
-                    unselectedIconColor = TextTertiary,
-                    unselectedTextColor = TextTertiary,
+                    unselectedIconColor = MaterialTheme.colorScheme.outline,
+                    unselectedTextColor = MaterialTheme.colorScheme.outline,
                     indicatorColor = AccentGreen.copy(alpha = 0.12f)
                 )
             )
@@ -635,7 +631,7 @@ fun HomeScreenPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun HomeScreenEmptyPreview() {
     AudioMemoTheme {
