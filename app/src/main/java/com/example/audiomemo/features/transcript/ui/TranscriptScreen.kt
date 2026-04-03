@@ -1,10 +1,14 @@
 package com.example.audiomemo.features.transcript.ui
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.IBinder
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
@@ -100,12 +104,39 @@ fun TranscriptScreen(
         }
     }
 
-    DisposableEffect(Unit) {
-        val intent = Intent(context, AudioRecordingService::class.java)
-        ContextCompat.startForegroundService(context, intent)
-        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    // Track whether RECORD_AUDIO permission has been granted. Re-checked each time the
+    // screen is shown so one-time permissions (revoked when the user leaves) are caught.
+    var hasRecordPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasRecordPermission = granted }
+
+    // Request the permission immediately if it is not already held.
+    LaunchedEffect(Unit) {
+        if (!hasRecordPermission) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // Start and bind the recording service only once permission is confirmed.
+    DisposableEffect(hasRecordPermission) {
+        var bound = false
+        if (hasRecordPermission) {
+            val intent = Intent(context, AudioRecordingService::class.java)
+            ContextCompat.startForegroundService(context, intent)
+            context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            bound = true
+        }
         onDispose {
-            try { context.unbindService(serviceConnection) } catch (_: Exception) {}
+            if (bound) {
+                try { context.unbindService(serviceConnection) } catch (_: Exception) {}
+            }
         }
     }
 

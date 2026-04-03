@@ -169,6 +169,10 @@ class AudioRecordingService : Service() {
                 NotificationHelper.buildPausedAudioFocusNotification(
                     this, resumePendingIntent(), stopPendingIntent()
                 )
+            AudioInterruptionManager.PauseReason.MIC_MUTED ->
+                NotificationHelper.buildPausedMicMutedNotification(
+                    this, resumePendingIntent(), stopPendingIntent()
+                )
         }
         NotificationHelper.updateNotification(this, notification)
     }
