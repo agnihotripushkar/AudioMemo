@@ -47,12 +47,15 @@ class TranscriptRetryWorker(
         val failedChunks = chunkDao.getChunksByStatus(ChunkStatus.FAILED)
             .filter { it.sessionId == sessionId }
 
+        val uploadConstraints = UploadPreferences.networkConstraints(applicationContext)
+
         failedChunks.forEach { chunk ->
             chunkDao.updateStatus(chunk.id, ChunkStatus.PENDING)
             WorkManager.getInstance(applicationContext).enqueueUniqueWork(
                 "${WhisperUploadWorker.WORK_NAME_PREFIX}${chunk.id}",
                 ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<WhisperUploadWorker>()
+                    .setConstraints(uploadConstraints)
                     .setInputData(
                         Data.Builder()
                             .putLong(WhisperUploadWorker.KEY_CHUNK_ID, chunk.id)

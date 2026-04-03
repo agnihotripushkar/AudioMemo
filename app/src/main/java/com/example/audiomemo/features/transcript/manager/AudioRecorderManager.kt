@@ -34,11 +34,18 @@ class AudioRecorderManager(private val context: Context) {
 
     private var currentOutputFile: File? = null
 
+    /** True while the recorder is actively capturing audio (false when paused or stopped). */
+    var isRecording: Boolean = false
+        private set
+
     /** Called whenever a 30-second chunk is completed (rotation or pause/stop). */
     var onChunkCompleted: ((File) -> Unit)? = null
 
     /** Called when storage drops below the minimum threshold during recording. */
     var onStorageLow: (() -> Unit)? = null
+
+    /** Called when MediaRecorder reports a hardware or server error. */
+    var onHardwareError: (() -> Unit)? = null
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -47,11 +54,13 @@ class AudioRecorderManager(private val context: Context) {
             onStorageLow?.invoke()
             return
         }
+        isRecording = true
         startNewChunk()
         startMonitoringJobs()
     }
 
     fun pauseRecording() {
+        isRecording = false
         cancelMonitoringJobs()
         finaliseCurrentChunk(label = "paused")
         _amplitude.value = 0
@@ -62,11 +71,13 @@ class AudioRecorderManager(private val context: Context) {
             onStorageLow?.invoke()
             return
         }
+        isRecording = true
         startNewChunk()
         startMonitoringJobs()
     }
 
     fun stopRecording() {
+        isRecording = false
         cancelMonitoringJobs()
         finaliseCurrentChunk(label = "final")
         _amplitude.value = 0
@@ -121,11 +132,17 @@ class AudioRecorderManager(private val context: Context) {
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setOutputFile(currentOutputFile?.absolutePath)
+            setOnErrorListener { _, _, _ ->
+                Log.e("AudioRecorderManager", "MediaRecorder hardware error — stopping recording")
+                cancelMonitoringJobs()
+                onHardwareError?.invoke()
+            }
             try {
                 prepare()
                 start()
             } catch (e: Exception) {
                 e.printStackTrace()
+                onHardwareError?.invoke()
             }
         }
     }

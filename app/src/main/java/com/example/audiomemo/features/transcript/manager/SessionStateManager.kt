@@ -23,6 +23,9 @@ class SessionStateManager(
     private var chunkIndex = 0
 
     suspend fun startSession(): Long = withContext(Dispatchers.IO) {
+        // Promote any RECORDING sessions left by a prior crash/process-kill to PAUSED so
+        // getLastActiveSession() doesn't surface them as still-live ghost sessions.
+        sessionDao.abandonOrphanedSessions()
         val id = sessionDao.insert(
             SessionEntity(
                 state = SessionState.RECORDING,

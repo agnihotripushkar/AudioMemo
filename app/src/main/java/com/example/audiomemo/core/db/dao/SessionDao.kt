@@ -32,7 +32,21 @@ interface SessionDao {
     @Query("DELETE FROM sessions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    /** Returns the most recent session that was not stopped cleanly — used for crash recovery. */
+    /**
+     * Returns the most recent session that was not stopped cleanly — used for crash recovery.
+     *
+     * WARNING: On process restart, sessions left in RECORDING state are ghost sessions (the
+     * recorder is no longer running). Call [abandonOrphanedSessions] before this to promote
+     * those to PAUSED so they are recovered correctly rather than treated as live sessions.
+     */
     @Query("SELECT * FROM sessions WHERE state != 'STOPPED' ORDER BY startTime DESC LIMIT 1")
     suspend fun getLastActiveSession(): SessionEntity?
+
+    /**
+     * Marks any session still in RECORDING state as PAUSED.
+     * Called at the start of each new session to clean up ghost sessions left by a process crash
+     * or kill — the recorder was no longer running for those sessions, so RECORDING is incorrect.
+     */
+    @Query("UPDATE sessions SET state = 'PAUSED' WHERE state = 'RECORDING'")
+    suspend fun abandonOrphanedSessions()
 }

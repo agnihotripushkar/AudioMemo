@@ -45,6 +45,12 @@ object NotificationHelper {
         stopIntent: PendingIntent
     ): Notification = buildPaused(context, "Paused \u2013 Audio focus lost", resumeIntent, stopIntent)
 
+    fun buildPausedMediaButtonNotification(
+        context: Context,
+        resumeIntent: PendingIntent,
+        stopIntent: PendingIntent
+    ): Notification = buildPaused(context, "Paused \u2013 Headset button", resumeIntent, stopIntent)
+
     fun buildPausedMicMutedNotification(
         context: Context,
         resumeIntent: PendingIntent,
@@ -69,6 +75,45 @@ object NotificationHelper {
         "No audio detected \u2013 Check microphone",
         stopIntent = stopIntent
     )
+
+    fun buildBatteryLowNotification(context: Context): Notification {
+        val contentIntent = contentPendingIntent(context)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("AudioMemo")
+            .setContentText("Recording stopped \u2013 Battery too low")
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentIntent(contentIntent)
+            .setOngoing(false)
+            .setSilent(false)
+            .setAutoCancel(true)
+            .build()
+    }
+
+    fun buildPermissionRevokedNotification(context: Context): Notification {
+        val contentIntent = contentPendingIntent(context)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("AudioMemo")
+            .setContentText("Recording stopped \u2013 Microphone permission was revoked")
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentIntent(contentIntent)
+            .setOngoing(false)
+            .setSilent(false)
+            .setAutoCancel(true)
+            .build()
+    }
+
+    fun buildHardwareErrorNotification(context: Context): Notification {
+        val contentIntent = contentPendingIntent(context)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("AudioMemo")
+            .setContentText("Recording stopped \u2013 Microphone error")
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentIntent(contentIntent)
+            .setOngoing(false)
+            .setSilent(false)
+            .setAutoCancel(true)
+            .build()
+    }
 
     fun buildLowStorageNotification(context: Context): Notification {
         val contentIntent = contentPendingIntent(context)

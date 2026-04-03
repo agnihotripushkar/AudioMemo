@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.hardware.usb.UsbManager
 import android.media.AudioAttributes
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -25,6 +27,7 @@ import androidx.core.content.ContextCompat
  *  3. Wired headset plug/unplug and ACTION_AUDIO_BECOMING_NOISY → source-changed notification
  *  4. Mic hardware mute toggle (API 27+) → pause; unmute → resume
  *  5. Bluetooth SCO connect/disconnect → source-changed notification + SCO lifecycle
+ *  6. USB audio device attach/detach → source-changed notification
  */
 class AudioInterruptionManager(
     private val context: Context,
@@ -151,7 +154,15 @@ class AudioInterruptionManager(
             TelephonyManager.CALL_STATE_IDLE -> {
                 if (pausedForCall) {
                     pausedForCall = false
-                    if (shouldResume()) onResumeRequested()
+                    if (shouldResume()) {
+                        onResumeRequested()
+                    } else if (pausedForFocus) {
+                        // The ringtone or phone app may have taken audio focus before the
+                        // call connected and may never return it. Re-request focus so the
+                        // system re-evaluates; if granted, focusChangeListener will resume.
+                        abandonAudioFocus()
+                        requestAudioFocus()
+                    }
                 }
             }
         }
@@ -295,6 +306,102 @@ class AudioInterruptionManager(
         audioManager.stopBluetoothSco()
     }
 
+    // ── USB audio device attach/detach ─────────────────────────────────────────
+
+    private var usbReceiverRegistered = false
+
+    private val usbReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context?, intent: Intent?) {
+            when (intent?.action) {
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    // Only notify if the newly attached device has an audio input
+                    val hasUsbInput = audioManager
+                        .getDevices(AudioManager.GET_DEVICES_INPUTS)
+                        .any {
+                            it.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
+                            it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+                        }
+                    if (hasUsbInput) onSourceChanged("USB microphone")
+                }
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    // If the detached device was an audio input, fall back to device mic
+                    val stillHasUsbInput = audioManager
+                        .getDevices(AudioManager.GET_DEVICES_INPUTS)
+                        .any {
+                            it.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
+                            it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+                        }
+                    if (!stillHasUsbInput) onSourceChanged("device microphone")
+                }
+            }
+        }
+    }
+
+    private fun registerUsbReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        // USB attach/detach are system broadcasts — RECEIVER_NOT_EXPORTED is fine.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(usbReceiver, filter)
+        }
+        usbReceiverRegistered = true
+    }
+
+    private fun unregisterUsbReceiver() {
+        if (usbReceiverRegistered) {
+            try { context.unregisterReceiver(usbReceiver) } catch (_: Exception) {}
+            usbReceiverRegistered = false
+        }
+    }
+
+    // ── Audio device add/remove (API 23+) ─────────────────────────────────────
+
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
+            val micDevice = addedDevices.firstOrNull { it.isMicInput() }
+            if (micDevice != null) onSourceChanged(micDevice.toSourceName())
+        }
+        override fun onAudioDevicesRemoved(removedDevices: Array<AudioDeviceInfo>) {
+            val micRemoved = removedDevices.any { it.isMicInput() }
+            if (micRemoved) {
+                val remaining = audioManager
+                    .getDevices(AudioManager.GET_DEVICES_INPUTS)
+                    .firstOrNull { it.isMicInput() }
+                onSourceChanged(remaining?.toSourceName() ?: "device microphone")
+            }
+        }
+    }
+
+    private fun AudioDeviceInfo.isMicInput(): Boolean = when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC,
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        AudioDeviceInfo.TYPE_USB_DEVICE,
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> true
+        else -> false
+    }
+
+    private fun AudioDeviceInfo.toSourceName(): String = when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC   -> "device microphone"
+        AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wired headset"
+        AudioDeviceInfo.TYPE_USB_HEADSET   -> "USB headset"
+        AudioDeviceInfo.TYPE_USB_DEVICE    -> "USB microphone"
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth headset"
+        else -> productName?.toString()?.takeIf { it.isNotBlank() } ?: "external microphone"
+    }
+
+    private fun registerAudioDeviceCallback() {
+        audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
+    }
+
+    private fun unregisterAudioDeviceCallback() {
+        audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+    }
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     fun start() {
@@ -303,6 +410,8 @@ class AudioInterruptionManager(
         registerHeadsetReceiver()
         registerMicMuteReceiver()
         registerScoReceiver()
+        registerUsbReceiver()
+        registerAudioDeviceCallback()
     }
 
     fun stop() {
@@ -314,5 +423,7 @@ class AudioInterruptionManager(
         }
         unregisterMicMuteReceiver()
         unregisterScoReceiver()
+        unregisterUsbReceiver()
+        unregisterAudioDeviceCallback()
     }
 }

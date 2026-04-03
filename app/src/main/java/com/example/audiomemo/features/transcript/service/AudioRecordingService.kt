@@ -5,11 +5,13 @@ import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.example.audiomemo.features.transcript.data.worker.UploadPreferences
 import com.example.audiomemo.data.db.dao.ChunkDao
 import com.example.audiomemo.data.db.dao.SessionDao
 import com.example.audiomemo.features.summary.data.worker.SummaryGenerationWorker
@@ -19,6 +21,8 @@ import com.example.audiomemo.features.transcript.data.worker.WhisperUploadWorker
 import com.example.audiomemo.features.transcript.domain.model.ChunkStatus
 import com.example.audiomemo.features.transcript.manager.AudioInterruptionManager
 import com.example.audiomemo.features.transcript.manager.AudioRecorderManager
+import com.example.audiomemo.features.transcript.manager.BatteryGuard
+import com.example.audiomemo.features.transcript.manager.MediaButtonHandler
 import com.example.audiomemo.features.transcript.manager.SessionStateManager
 import com.example.audiomemo.features.transcript.manager.SilenceDetector
 import com.example.audiomemo.features.transcript.util.NotificationHelper
@@ -60,6 +64,13 @@ class AudioRecordingService : Service() {
     private lateinit var interruptionManager: AudioInterruptionManager
     private lateinit var silenceDetector: SilenceDetector
     private lateinit var sessionStateManager: SessionStateManager
+    private lateinit var batteryGuard: BatteryGuard
+    private lateinit var mediaButtonHandler: MediaButtonHandler
+
+    /** True while the service is actively recording (not stopped). Used to reject duplicate starts. */
+    private var isRecordingActive = false
+    /** True when the user has manually paused via a headset/media button. */
+    private var isMediaButtonPaused = false
 
     private val _isStopped = MutableStateFlow(false)
     val isStopped: StateFlow<Boolean> = _isStopped.asStateFlow()
@@ -95,6 +106,7 @@ class AudioRecordingService : Service() {
             lastChunkSaveJob = serviceScope.launch { sessionStateManager.saveChunk(file.absolutePath) }
         }
         recorder.onStorageLow = { handleLowStorage() }
+        recorder.onHardwareError = { handleHardwareError() }
 
         interruptionManager = AudioInterruptionManager(
             context = this,
@@ -104,8 +116,22 @@ class AudioRecordingService : Service() {
         )
 
         silenceDetector = SilenceDetector(
+            context = this,
             amplitude = recorder.amplitude,
-            onSilenceDetected = { handleSilenceDetected() }
+            onSilenceDetected = { handleSilenceDetected() },
+            onPermissionRevoked = { handlePermissionRevoked() }
+        )
+
+        batteryGuard = BatteryGuard(
+            context = this,
+            onBatteryLow = { handleBatteryLow() }
+        )
+
+        mediaButtonHandler = MediaButtonHandler(
+            context = this,
+            onToggle    = { handleMediaButtonToggle() },
+            onPauseOnly = { if (recorder.isRecording) handleMediaButtonPause() },
+            onPlayOnly  = { if (isMediaButtonPaused) handleMediaButtonPlay() }
         )
     }
 
@@ -116,12 +142,20 @@ class AudioRecordingService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
+                // Clear any user-initiated media-button pause so handleInterruptionResume resumes normally.
+                isMediaButtonPaused = false
                 handleInterruptionResume()
                 return START_NOT_STICKY
             }
         }
 
+        // ── Guard against duplicate starts ─────────────────────────────────────
+        // TranscriptScreen may call startForegroundService more than once (e.g. back-stack
+        // manipulation). Skip re-initialization if recording is already in progress.
+        if (isRecordingActive) return START_STICKY
+
         // ── Start recording ────────────────────────────────────────────────────
+        isRecordingActive = true
         NotificationHelper.createNotificationChannel(this)
         startForeground(
             NotificationHelper.NOTIFICATION_ID,
@@ -136,6 +170,8 @@ class AudioRecordingService : Service() {
         recorder.startRecording()
         interruptionManager.start()
         silenceDetector.start()
+        batteryGuard.start()
+        mediaButtonHandler.start()
 
         return START_STICKY
     }
@@ -147,8 +183,10 @@ class AudioRecordingService : Service() {
             recorder.stopRecording()
             silenceDetector.stop()
             interruptionManager.stop()
+            batteryGuard.stop()
             serviceScope.launch { sessionStateManager.pauseSession() }
         }
+        mediaButtonHandler.stop()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -178,6 +216,17 @@ class AudioRecordingService : Service() {
     }
 
     private fun handleInterruptionResume() {
+        // If the user has manually paused via headset button, keep the recorder paused
+        // and show the media-button pause notification instead of resuming.
+        if (isMediaButtonPaused) {
+            NotificationHelper.updateNotification(
+                this,
+                NotificationHelper.buildPausedMediaButtonNotification(
+                    this, resumePendingIntent(), stopPendingIntent()
+                )
+            )
+            return
+        }
         recorder.resumeRecording()
         silenceDetector.reset()
         silenceDetector.start()
@@ -186,6 +235,44 @@ class AudioRecordingService : Service() {
             this,
             NotificationHelper.buildForegroundNotification(this, stopPendingIntent())
         )
+    }
+
+    // ── Media button handlers ──────────────────────────────────────────────────
+
+    private fun handleMediaButtonToggle() {
+        if (_isStopped.value) return
+        if (recorder.isRecording) handleMediaButtonPause() else handleMediaButtonPlay()
+    }
+
+    private fun handleMediaButtonPause() {
+        if (_isStopped.value || !recorder.isRecording) return
+        isMediaButtonPaused = true
+        recorder.pauseRecording()
+        silenceDetector.stop()
+        serviceScope.launch { sessionStateManager.pauseSession() }
+        NotificationHelper.updateNotification(
+            this,
+            NotificationHelper.buildPausedMediaButtonNotification(
+                this, resumePendingIntent(), stopPendingIntent()
+            )
+        )
+    }
+
+    private fun handleMediaButtonPlay() {
+        if (_isStopped.value || !isMediaButtonPaused) return
+        isMediaButtonPaused = false
+        // Only physically resume the recorder if no other interruption (call/focus/mic) is
+        // still active. If one is, handleInterruptionResume will resume when it clears.
+        if (!recorder.isRecording) {
+            recorder.resumeRecording()
+            silenceDetector.reset()
+            silenceDetector.start()
+            serviceScope.launch { sessionStateManager.resumeSession() }
+            NotificationHelper.updateNotification(
+                this,
+                NotificationHelper.buildForegroundNotification(this, stopPendingIntent())
+            )
+        }
     }
 
     private fun handleSourceChanged(sourceName: String) {
@@ -213,10 +300,34 @@ class AudioRecordingService : Service() {
         )
     }
 
+    private fun handleBatteryLow() {
+        recorder.stopRecording()
+        silenceDetector.stop()
+        interruptionManager.stop()
+        batteryGuard.stop()
+        val sessionId = sessionStateManager.currentSessionId
+        val savedChunkJob = lastChunkSaveJob
+        serviceScope.launch {
+            savedChunkJob?.join()
+            sessionStateManager.stopSession()
+            cancelFinalizationWorker(sessionId)
+            enqueueTranscriptionChain(sessionId)
+        }
+        _isStopped.value = true
+
+        NotificationHelper.updateNotification(
+            this,
+            NotificationHelper.buildBatteryLowNotification(this)
+        )
+        stopForeground(STOP_FOREGROUND_DETACH)
+        stopSelf()
+    }
+
     private fun handleLowStorage() {
         recorder.stopRecording()
         silenceDetector.stop()
         interruptionManager.stop()
+        batteryGuard.stop()
         val sessionId = sessionStateManager.currentSessionId
         val savedChunkJob = lastChunkSaveJob
         serviceScope.launch {
@@ -235,11 +346,58 @@ class AudioRecordingService : Service() {
         stopSelf()
     }
 
+    private fun handlePermissionRevoked() {
+        recorder.stopRecording()
+        silenceDetector.stop()
+        interruptionManager.stop()
+        batteryGuard.stop()
+        val sessionId = sessionStateManager.currentSessionId
+        val savedChunkJob = lastChunkSaveJob
+        serviceScope.launch {
+            savedChunkJob?.join()
+            sessionStateManager.stopSession()
+            cancelFinalizationWorker(sessionId)
+            enqueueTranscriptionChain(sessionId)
+        }
+        _isStopped.value = true
+
+        NotificationHelper.updateNotification(
+            this,
+            NotificationHelper.buildPermissionRevokedNotification(this)
+        )
+        stopForeground(STOP_FOREGROUND_DETACH)
+        stopSelf()
+    }
+
+    private fun handleHardwareError() {
+        silenceDetector.stop()
+        interruptionManager.stop()
+        batteryGuard.stop()
+        val sessionId = sessionStateManager.currentSessionId
+        val savedChunkJob = lastChunkSaveJob
+        serviceScope.launch {
+            savedChunkJob?.join()
+            sessionStateManager.stopSession()
+            cancelFinalizationWorker(sessionId)
+            enqueueTranscriptionChain(sessionId)
+        }
+        _isStopped.value = true
+
+        NotificationHelper.updateNotification(
+            this,
+            NotificationHelper.buildHardwareErrorNotification(this)
+        )
+        stopForeground(STOP_FOREGROUND_DETACH)
+        stopSelf()
+    }
+
     /** Normal stop via user action (Stop button or ACTION_STOP intent). */
     private fun stopRecordingCleanly() {
         recorder.stopRecording()
         silenceDetector.stop()
         interruptionManager.stop()
+        batteryGuard.stop()
+        mediaButtonHandler.stop()
         val sessionId = sessionStateManager.currentSessionId
         val savedChunkJob = lastChunkSaveJob
         serviceScope.launch {
@@ -293,8 +451,11 @@ class AudioRecordingService : Service() {
             return
         }
 
+        val uploadConstraints: Constraints = UploadPreferences.networkConstraints(applicationContext)
+
         val uploadRequests = pendingChunks.map { chunk ->
             OneTimeWorkRequestBuilder<WhisperUploadWorker>()
+                .setConstraints(uploadConstraints)
                 .setInputData(
                     workDataOf(
                         WhisperUploadWorker.KEY_CHUNK_ID to chunk.id,

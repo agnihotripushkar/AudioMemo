@@ -1,5 +1,9 @@
 package com.example.audiomemo.features.transcript.manager
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -12,10 +16,15 @@ import kotlinx.coroutines.launch
  * Monitors the MediaRecorder amplitude stream. After [SILENCE_TIMEOUT_MS] of continuous
  * silence (amplitude below [SILENCE_THRESHOLD]), fires [onSilenceDetected] once per
  * silence period so the service can show a "No audio detected – Check microphone" warning.
+ *
+ * Also checks on every tick whether RECORD_AUDIO has been revoked (Android 11+ one-time
+ * permissions). Fires [onPermissionRevoked] so the service can stop cleanly.
  */
 class SilenceDetector(
+    private val context: Context,
     private val amplitude: StateFlow<Int>,
-    private val onSilenceDetected: () -> Unit
+    private val onSilenceDetected: () -> Unit,
+    private val onPermissionRevoked: () -> Unit = {}
 ) {
     companion object {
         private const val SILENCE_THRESHOLD = 500
@@ -34,6 +43,13 @@ class SilenceDetector(
         job = scope.launch {
             while (isActive) {
                 delay(CHECK_INTERVAL_MS)
+                // Stop immediately if RECORD_AUDIO was revoked while backgrounded.
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
+                    onPermissionRevoked()
+                    break
+                }
                 if (amplitude.value < SILENCE_THRESHOLD) {
                     silentDurationMs += CHECK_INTERVAL_MS
                     if (silentDurationMs >= SILENCE_TIMEOUT_MS && !warningEmitted) {
