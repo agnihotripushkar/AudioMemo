@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
@@ -22,6 +23,8 @@ import androidx.core.content.ContextCompat
  *  1. Phone call (RINGING / OFFHOOK) → pause; IDLE → resume
  *  2. Audio focus loss (another app takes focus) → pause; AUDIOFOCUS_GAIN → resume
  *  3. Wired headset plug/unplug and ACTION_AUDIO_BECOMING_NOISY → source-changed notification
+ *  4. Mic hardware mute toggle (API 27+) → pause; unmute → resume
+ *  5. Bluetooth SCO connect/disconnect → source-changed notification + SCO lifecycle
  */
 class AudioInterruptionManager(
     private val context: Context,
@@ -29,13 +32,16 @@ class AudioInterruptionManager(
     private val onResumeRequested: () -> Unit,
     private val onSourceChanged: (sourceName: String) -> Unit
 ) {
-    enum class PauseReason { PHONE_CALL, AUDIO_FOCUS }
+    enum class PauseReason { PHONE_CALL, AUDIO_FOCUS, MIC_MUTED }
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
     @Volatile private var pausedForCall = false
     @Volatile private var pausedForFocus = false
+    @Volatile private var pausedForMicMute = false
+
+    private fun shouldResume() = !pausedForCall && !pausedForFocus && !pausedForMicMute
 
     // ── Audio Focus ────────────────────────────────────────────────────────────
 
@@ -48,13 +54,13 @@ class AudioInterruptionManager(
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 if (!pausedForFocus) {
                     pausedForFocus = true
-                    if (!pausedForCall) onPauseRequested(PauseReason.AUDIO_FOCUS)
+                    if (!pausedForCall && !pausedForMicMute) onPauseRequested(PauseReason.AUDIO_FOCUS)
                 }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 if (pausedForFocus) {
                     pausedForFocus = false
-                    if (!pausedForCall) onResumeRequested()
+                    if (shouldResume()) onResumeRequested()
                 }
             }
         }
@@ -145,7 +151,7 @@ class AudioInterruptionManager(
             TelephonyManager.CALL_STATE_IDLE -> {
                 if (pausedForCall) {
                     pausedForCall = false
-                    if (!pausedForFocus) onResumeRequested()
+                    if (shouldResume()) onResumeRequested()
                 }
             }
         }
@@ -202,12 +208,101 @@ class AudioInterruptionManager(
         headsetReceiverRegistered = true
     }
 
+    // ── Mic hardware mute toggle (API 27+) ────────────────────────────────────
+
+    private var micMuteReceiverRegistered = false
+
+    private val micMuteReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context?, intent: Intent?) {
+            val muted = audioManager.isMicrophoneMute
+            if (muted && !pausedForMicMute) {
+                pausedForMicMute = true
+                if (!pausedForCall && !pausedForFocus) onPauseRequested(PauseReason.MIC_MUTED)
+            } else if (!muted && pausedForMicMute) {
+                pausedForMicMute = false
+                if (shouldResume()) onResumeRequested()
+            }
+        }
+    }
+
+    private fun registerMicMuteReceiver() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return // API 27+
+        val filter = IntentFilter(AudioManager.ACTION_MICROPHONE_MUTE_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(micMuteReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(micMuteReceiver, filter)
+        }
+        micMuteReceiverRegistered = true
+        // Check initial state in case mic was already muted when recording started
+        if (audioManager.isMicrophoneMute) {
+            pausedForMicMute = true
+            if (!pausedForCall && !pausedForFocus) onPauseRequested(PauseReason.MIC_MUTED)
+        }
+    }
+
+    private fun unregisterMicMuteReceiver() {
+        if (micMuteReceiverRegistered) {
+            try { context.unregisterReceiver(micMuteReceiver) } catch (_: Exception) {}
+            micMuteReceiverRegistered = false
+        }
+    }
+
+    // ── Bluetooth SCO ──────────────────────────────────────────────────────────
+
+    private var scoReceiverRegistered = false
+
+    private val scoReceiver = object : BroadcastReceiver() {
+        @Suppress("DEPRECATION")
+        override fun onReceive(ctx: Context?, intent: Intent?) {
+            val state = intent?.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, -1) ?: return
+            when (state) {
+                AudioManager.SCO_AUDIO_STATE_CONNECTED ->
+                    onSourceChanged("Bluetooth headset")
+                AudioManager.SCO_AUDIO_STATE_DISCONNECTED,
+                AudioManager.SCO_AUDIO_STATE_ERROR -> {
+                    audioManager.stopBluetoothSco()
+                    onSourceChanged("device microphone")
+                }
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun registerScoReceiver() {
+        val filter = IntentFilter(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(scoReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(scoReceiver, filter)
+        }
+        scoReceiverRegistered = true
+        // Start SCO if a Bluetooth SCO input device is already connected
+        val hasBtSco = audioManager
+            .getDevices(AudioManager.GET_DEVICES_INPUTS)
+            .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+        if (hasBtSco) {
+            audioManager.startBluetoothSco()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun unregisterScoReceiver() {
+        if (scoReceiverRegistered) {
+            try { context.unregisterReceiver(scoReceiver) } catch (_: Exception) {}
+            scoReceiverRegistered = false
+        }
+        audioManager.stopBluetoothSco()
+    }
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     fun start() {
         requestAudioFocus()
         registerPhoneStateListener()
         registerHeadsetReceiver()
+        registerMicMuteReceiver()
+        registerScoReceiver()
     }
 
     fun stop() {
@@ -217,5 +312,7 @@ class AudioInterruptionManager(
             try { context.unregisterReceiver(headsetReceiver) } catch (_: Exception) {}
             headsetReceiverRegistered = false
         }
+        unregisterMicMuteReceiver()
+        unregisterScoReceiver()
     }
 }

@@ -1,40 +1,19 @@
 package com.example.audiomemo.ui.theme
 
+import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 /**
- * AudioMemo dark color scheme.
- *
- * Slot mapping:
- *   primary            → AccentGreen       (FABs, record button, active tab indicator)
- *   onPrimary          → TextPrimary       (text/icons on green surfaces)
- *   primaryContainer   → NavyElevated      (chip backgrounds, waveform container)
- *   onPrimaryContainer → AccentGreenLight  (icons inside primary containers)
- *
- *   secondary          → AccentGreenDark   (secondary actions, outlined buttons tint)
- *   onSecondary        → TextPrimary
- *   secondaryContainer → NavyCard          (recording status card)
- *   onSecondaryContainer → TextSecondary
- *
- *   tertiary           → LegacyOrange      (accent highlights, "your memories" text)
- *   onTertiary         → TextPrimary
- *
- *   background         → NavyBackground    (all screen backgrounds)
- *   onBackground       → TextPrimary
- *
- *   surface            → NavySurface       (cards, bottom sheets, top bars)
- *   onSurface          → TextPrimary
- *   surfaceVariant     → NavyElevated      (tab rows, divider background)
- *   onSurfaceVariant   → TextSecondary
- *
- *   outline            → DividerColor      (HorizontalDivider, card borders)
- *   outlineVariant     → NavyCard
- *
- *   error              → ErrorRed
- *   onError            → TextPrimary
+ * AudioMemo dark color scheme — Electric Violet (#8B5CF6) theme.
  */
 private val AudioMemoDarkColorScheme = darkColorScheme(
     primary                = AccentGreen,
@@ -69,10 +48,62 @@ private val AudioMemoDarkColorScheme = darkColorScheme(
     onErrorContainer       = ErrorRed,
 )
 
+/**
+ * AudioMemo light color scheme — Sonic Fluid Light.
+ * Clean white surfaces with Electric Violet (#8B5CF6) accents.
+ */
+private val AudioMemoLightColorScheme = lightColorScheme(
+    primary                = AccentGreen,
+    onPrimary              = Color.White,
+    primaryContainer       = LightPrimaryContainer,
+    onPrimaryContainer     = LightOnPrimaryContainer,
+
+    secondary              = AccentGreenDark,
+    onSecondary            = Color.White,
+    secondaryContainer     = Color(0xFFE8DEF8),
+    onSecondaryContainer   = Color(0xFF1D192B),
+
+    tertiary               = LegacyOrange,
+    onTertiary             = Color.White,
+    tertiaryContainer      = Color(0xFFFFD8E4),
+    onTertiaryContainer    = Color(0xFF31111D),
+
+    background             = LightBackground,
+    onBackground           = LightOnBackground,
+
+    surface                = LightSurface,
+    onSurface              = LightOnSurface,
+    surfaceVariant         = LightSurfaceVariant,
+    onSurfaceVariant       = LightOnSurfaceVariant,
+
+    outline                = LightOutline,
+    outlineVariant         = LightOutlineVariant,
+
+    error                  = ErrorRed,
+    onError                = Color.White,
+    errorContainer         = Color(0xFFFFDAD6),
+    onErrorContainer       = Color(0xFF410002),
+)
+
 @Composable
-fun AudioMemoTheme(content: @Composable () -> Unit) {
+fun AudioMemoTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val colorScheme = if (darkTheme) AudioMemoDarkColorScheme else AudioMemoLightColorScheme
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = Color.Transparent.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+        }
+    }
+
     MaterialTheme(
-        colorScheme = AudioMemoDarkColorScheme,
+        colorScheme = colorScheme,
         typography  = AudioMemoTypography,
         content     = content
     )

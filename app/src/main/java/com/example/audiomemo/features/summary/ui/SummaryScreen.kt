@@ -58,9 +58,6 @@ import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.summary.ui.state.SummaryUiState
 import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
-import com.example.audiomemo.ui.theme.DividerColor
-import com.example.audiomemo.ui.theme.TextSecondary
-import com.example.audiomemo.ui.theme.TextTertiary
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -112,7 +109,7 @@ private fun LoadingContent() {
             Text(
                 text = stringResource(R.string.summary_generating),
                 style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -154,7 +151,7 @@ private fun FailedContent(
             Text(
                 text = stringResource(R.string.summary_failed_body),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(Modifier.height(8.dp))
@@ -175,7 +172,7 @@ private fun FailedContent(
             OutlinedButton(
                 onClick = onNavigateBack,
                 shape = RoundedCornerShape(50),
-                border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.onSurface
                 ),
@@ -206,7 +203,7 @@ private fun SummaryContent(
             modifier = Modifier.statusBarsPadding()
         )
 
-        HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 
         // Scrollable content
         LazyColumn(
@@ -226,7 +223,7 @@ private fun SummaryContent(
                 Text(
                     text = stringResource(R.string.summary_ai_generated),
                     style = MaterialTheme.typography.labelMedium,
-                    color = TextTertiary
+                    color = MaterialTheme.colorScheme.outline
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -340,7 +337,7 @@ private fun SummaryTopBar(
             Icon(
                 imageVector = Icons.Default.Share,
                 contentDescription = stringResource(R.string.cd_share),
-                tint = TextSecondary
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -389,7 +386,7 @@ private fun SectionCard(
             }
 
             Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
             Spacer(Modifier.height(12.dp))
 
             content()
@@ -465,7 +462,7 @@ private fun SummaryBottomBar(
             OutlinedButton(
                 onClick = onViewTranscript,
                 shape = RoundedCornerShape(50),
-                border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.onSurface
                 ),

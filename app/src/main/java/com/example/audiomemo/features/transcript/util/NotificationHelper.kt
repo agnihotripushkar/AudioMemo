@@ -45,6 +45,12 @@ object NotificationHelper {
         stopIntent: PendingIntent
     ): Notification = buildPaused(context, "Paused \u2013 Audio focus lost", resumeIntent, stopIntent)
 
+    fun buildPausedMicMutedNotification(
+        context: Context,
+        resumeIntent: PendingIntent,
+        stopIntent: PendingIntent
+    ): Notification = buildPaused(context, "Paused \u2013 Microphone muted", resumeIntent, stopIntent)
+
     fun buildMicSourceChangedNotification(
         context: Context,
         sourceName: String,

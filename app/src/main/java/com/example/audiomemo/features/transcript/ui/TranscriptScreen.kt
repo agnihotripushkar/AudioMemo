@@ -1,10 +1,14 @@
 package com.example.audiomemo.features.transcript.ui
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.IBinder
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
@@ -74,10 +78,7 @@ import com.example.audiomemo.features.transcript.service.AudioRecordingService
 import com.example.audiomemo.features.transcript.ui.state.TranscriptUiState
 import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
-import com.example.audiomemo.ui.theme.DividerColor
 import com.example.audiomemo.ui.theme.RecordingRed
-import com.example.audiomemo.ui.theme.TextSecondary
-import com.example.audiomemo.ui.theme.TextTertiary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -103,12 +104,39 @@ fun TranscriptScreen(
         }
     }
 
-    DisposableEffect(Unit) {
-        val intent = Intent(context, AudioRecordingService::class.java)
-        ContextCompat.startForegroundService(context, intent)
-        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    // Track whether RECORD_AUDIO permission has been granted. Re-checked each time the
+    // screen is shown so one-time permissions (revoked when the user leaves) are caught.
+    var hasRecordPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasRecordPermission = granted }
+
+    // Request the permission immediately if it is not already held.
+    LaunchedEffect(Unit) {
+        if (!hasRecordPermission) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // Start and bind the recording service only once permission is confirmed.
+    DisposableEffect(hasRecordPermission) {
+        var bound = false
+        if (hasRecordPermission) {
+            val intent = Intent(context, AudioRecordingService::class.java)
+            ContextCompat.startForegroundService(context, intent)
+            context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            bound = true
+        }
         onDispose {
-            try { context.unbindService(serviceConnection) } catch (_: Exception) {}
+            if (bound) {
+                try { context.unbindService(serviceConnection) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -206,7 +234,7 @@ private fun TranscriptContent(
             onTabSelected = onTabSelected
         )
 
-        HorizontalDivider(color = DividerColor, thickness = 0.5.dp)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 
         // Tab content
         Box(
@@ -288,7 +316,7 @@ private fun TranscriptTopBar(
                 text = formatTime(elapsedSeconds),
                 style = MaterialTheme.typography.titleMedium,
                 color = if (isRecording) MaterialTheme.colorScheme.onBackground
-                        else TextSecondary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -358,7 +386,7 @@ private fun TranscriptTabRow(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) AccentGreen else TextTertiary,
+                    color = if (isSelected) AccentGreen else MaterialTheme.colorScheme.outline,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )
                 Spacer(Modifier.height(6.dp))
@@ -393,7 +421,7 @@ private fun ComingSoonTab(featureName: String) {
             Text(
                 text = stringResource(R.string.coming_soon_feature_body, featureName),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextTertiary
+                color = MaterialTheme.colorScheme.outline
             )
         }
     }
@@ -416,7 +444,7 @@ private fun NotesTab(isRecording: Boolean) {
                     Icon(
                         imageVector = Icons.Default.Notes,
                         contentDescription = null,
-                        tint = TextTertiary,
+                        tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -427,7 +455,7 @@ private fun NotesTab(isRecording: Boolean) {
                 else
                     stringResource(R.string.transcript_notes_stopped),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }
@@ -472,7 +500,7 @@ private fun TranscriptWaitingState() {
             Text(
                 text = stringResource(R.string.transcript_live_body),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }
@@ -498,7 +526,7 @@ private fun TranscriptPostRecordingContent(uiState: TranscriptUiState.PostRecord
                     else
                         stringResource(R.string.transcript_placeholder),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextTertiary,
+                    color = MaterialTheme.colorScheme.outline,
                     textAlign = TextAlign.Center
                 )
             }
@@ -546,7 +574,7 @@ private fun TranscriptionStatusBanner(isComplete: Boolean) {
                 text = if (isComplete) stringResource(R.string.transcript_transcription_complete)
                    else stringResource(R.string.transcript_transcribing),
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isComplete) AccentGreen else TextSecondary
+                color = if (isComplete) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -569,7 +597,7 @@ private fun RecordingBottomBar(
         OutlinedButton(
             onClick = {},
             shape = RoundedCornerShape(50),
-            border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
@@ -578,7 +606,7 @@ private fun RecordingBottomBar(
             Icon(
                 imageVector = Icons.Default.AutoAwesome,
                 contentDescription = null,
-                tint = TextTertiary,
+                tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(16.dp)
             )
             Spacer(Modifier.width(5.dp))
@@ -620,7 +648,7 @@ private fun RecordingBottomBar(
                     modifier = Modifier
                         .height(22.dp)
                         .width(1.dp)
-                        .background(DividerColor)
+                        .background(MaterialTheme.colorScheme.outline)
                 )
 
                 // Stop
@@ -659,7 +687,7 @@ private fun PostRecordingBottomBar(
         OutlinedButton(
             onClick = onDone,
             shape = RoundedCornerShape(50),
-            border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.onSurface
