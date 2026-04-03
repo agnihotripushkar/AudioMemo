@@ -10,6 +10,9 @@ import android.os.IBinder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.EaseInOut
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -104,8 +107,7 @@ fun TranscriptScreen(
         }
     }
 
-    // Track whether RECORD_AUDIO permission has been granted. Re-checked each time the
-    // screen is shown so one-time permissions (revoked when the user leaves) are caught.
+    // Track whether RECORD_AUDIO permission has been granted.
     var hasRecordPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
@@ -122,6 +124,22 @@ fun TranscriptScreen(
         if (!hasRecordPermission) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // Re-evaluate the permission on every resume so that one-time grants revoked while
+    // the app was backgrounded (Android 11+) are detected before the service restarts.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val current = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+                if (current != hasRecordPermission) hasRecordPermission = current
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Start and bind the recording service only once permission is confirmed.
