@@ -471,7 +471,7 @@ private fun SummaryBottomBar(
                     .height(52.dp)
             ) {
                 Text(
-                    text = "View Transcript",
+                    text = stringResource(R.string.summary_view_transcript),
                     style = MaterialTheme.typography.labelLarge
                 )
             }

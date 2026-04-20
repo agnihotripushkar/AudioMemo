@@ -111,6 +111,9 @@ dependencies {
     // Splash Screen
     implementation(libs.androidx.core.splashscreen)
 
+    // DataStore
+    implementation(libs.datastore.preferences)
+
     // OkHttp Logging (debug only)
     debugImplementation(libs.okhttp.logging.interceptor)
 

@@ -10,6 +10,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontFamily
 import androidx.core.view.WindowCompat
 
 /**
@@ -88,6 +89,7 @@ private val AudioMemoLightColorScheme = lightColorScheme(
 @Composable
 fun AudioMemoTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    fontFamily: FontFamily = FontFamily.Default,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) AudioMemoDarkColorScheme else AudioMemoLightColorScheme
@@ -105,7 +107,7 @@ fun AudioMemoTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography  = AudioMemoTypography,
+        typography  = audioMemoTypography(fontFamily),
         content     = content
     )
 }

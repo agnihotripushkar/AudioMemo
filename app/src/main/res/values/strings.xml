@@ -26,6 +26,47 @@
     <string name="home_status_processing">Processing</string>
     <string name="home_status_failed">Failed</string>
 
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_rate_app">Rate App</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
+    <string name="settings_version">Version</string>
+
+    <!-- Meetings Dashboard -->
+    <string name="meetings_title">Meetings</string>
+    <string name="meetings_empty_title">No meetings yet</string>
+    <string name="meetings_empty_body">Capture your first note to get started</string>
+    <string name="meetings_cd_summary_ready">Summary ready</string>
+    <string name="meetings_cd_generating">Generating</string>
+
+    <!-- Meeting Details -->
+    <string name="meeting_details_tab_transcript">Transcript</string>
+    <string name="meeting_details_tab_summary">Summary</string>
+    <string name="meeting_details_no_transcript">No transcript available yet</string>
+    <string name="meeting_details_generating_summary">Generating summary…</string>
+    <string name="meeting_details_chunk_label">Chunk %d</string>
+
+    <!-- Appearance -->
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_section_theme">Theme</string>
+    <string name="appearance_section_font">Font</string>
+    <string name="appearance_theme_system">System</string>
+    <string name="appearance_theme_light">Light</string>
+    <string name="appearance_theme_dark">Dark</string>
+
+    <!-- Font descriptions -->
+    <string name="font_desc_default">Clean and modern</string>
+    <string name="font_desc_nunito">Friendly and rounded</string>
+    <string name="font_desc_poppins">Modern geometric</string>
+    <string name="font_desc_plus_jakarta">Sharp and contemporary</string>
+    <string name="font_desc_space_grotesk">Technical sans-serif</string>
+    <string name="font_desc_playfair">Elegant serif</string>
+    <string name="font_desc_dancing_script">Handwritten style</string>
+    <string name="font_desc_roboto_mono">Technical and precise</string>
+
     <!-- Coming Soon (shared placeholder) -->
     <string name="coming_soon_title">Coming Soon</string>
     <string name="coming_soon_feature_body">%s feature is on its way!</string>

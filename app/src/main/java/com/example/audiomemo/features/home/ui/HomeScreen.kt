@@ -87,6 +87,11 @@ import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AccentGreenDark
 import com.example.audiomemo.ui.theme.AccentGreenLight
 import com.example.audiomemo.ui.theme.AudioMemoTheme
+import com.example.audiomemo.ui.theme.HeroGlowCore
+import com.example.audiomemo.ui.theme.HeroGlowEdge
+import com.example.audiomemo.ui.theme.HeroGlowMid
+import com.example.audiomemo.ui.theme.RecordingRed
+import com.example.audiomemo.ui.theme.TextPrimary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -96,6 +101,7 @@ fun HomeScreen(
     onNavigateToTranscript: () -> Unit,
     onNavigateToMeetings: () -> Unit = {},
     onNavigateToMeetingDetails: (Long) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -117,6 +123,7 @@ fun HomeScreen(
         recentMeetings = recentMeetings,
         permissionDeniedMessage = permissionDeniedMessage,
         onNavigateToMeetings = onNavigateToMeetings,
+        onNavigateToSettings = onNavigateToSettings,
         onMeetingClick = onNavigateToMeetingDetails,
         onCaptureClick = {
             val hasAudio = ContextCompat.checkSelfPermission(
@@ -144,6 +151,7 @@ fun HomeContent(
     recentMeetings: List<MeetingListItem>,
     permissionDeniedMessage: String?,
     onNavigateToMeetings: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onMeetingClick: (Long) -> Unit,
     onCaptureClick: () -> Unit
 ) {
@@ -163,7 +171,11 @@ fun HomeContent(
             )
         },
         bottomBar = {
-            HomeBottomNavBar(onMeetingsClick = onNavigateToMeetings)
+            HomeBottomNavBar(
+                selectedTab = HomeTab.Home,
+                onMeetingsClick = onNavigateToMeetings,
+                onSettingsClick = onNavigateToSettings
+            )
         }
     ) { paddingValues ->
         LazyColumn(
@@ -259,7 +271,7 @@ private fun TimerComponent() {
                     .size(8.dp)
                     .clip(CircleShape)
                     .background(
-                        Color.Red.copy(alpha = blink)
+                        RecordingRed.copy(alpha = blink)
                     )
 
             )
@@ -323,9 +335,9 @@ private fun RecordButtonSection(
             .background(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF6D3FD4),              // vivid violet core
-                        Color(0xFF3B1F7A).copy(alpha = 0.8f), // mid purple
-                        Color(0xFF1A1040).copy(alpha = 0.5f), // soft fade
+                        HeroGlowCore,
+                        HeroGlowMid.copy(alpha = 0.8f),
+                        HeroGlowEdge.copy(alpha = 0.5f),
                         bgColor.copy(alpha = 0f)
                     ),
                     center = Offset(
@@ -358,7 +370,7 @@ private fun RecordButtonSection(
                 Icon(
                     imageVector = Icons.Default.Mic,
                     contentDescription = stringResource(R.string.cd_record),
-                    tint = Color.White,
+                    tint = TextPrimary,
                     modifier = Modifier.size(64.dp)
                 )
             }
@@ -527,28 +539,33 @@ private fun EmptyRecordingsState() {
 
 // ── Bottom nav bar ────────────────────────────────────────────────────────────
 
-private enum class HomeTab(@StringRes val labelRes: Int, val icon: ImageVector) {
+enum class HomeTab(@StringRes val labelRes: Int, val icon: ImageVector) {
     Home(R.string.nav_tab_home, Icons.Default.Home),
     Meetings(R.string.nav_tab_meetings, Icons.Default.MeetingRoom),
     Settings(R.string.nav_tab_settings, Icons.Default.Settings)
 }
 
 @Composable
-private fun HomeBottomNavBar(onMeetingsClick: () -> Unit) {
+fun HomeBottomNavBar(
+    selectedTab: HomeTab = HomeTab.Home,
+    onHomeClick: () -> Unit = {},
+    onMeetingsClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {}
+) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         modifier = Modifier.navigationBarsPadding()
     ) {
         HomeTab.entries.forEach { tab ->
-            val selected = tab == HomeTab.Home
+            val selected = tab == selectedTab
             NavigationBarItem(
                 selected = selected,
                 onClick = {
                     when (tab) {
+                        HomeTab.Home -> onHomeClick()
                         HomeTab.Meetings -> onMeetingsClick()
-                        else -> { /* Home = current, Settings = future */
-                        }
+                        HomeTab.Settings -> onSettingsClick()
                     }
                 },
                 icon = {

@@ -30,6 +30,11 @@ val HeroSkyTop        = Color(0xFF0D0B18)
 val HeroSkyMid        = Color(0xFF160E2E)
 val HeroSkyBottom     = Color(0xFF1E1738)
 
+// ── Record button radial glow ─────────────────────────────────────────────────
+val HeroGlowCore      = Color(0xFF6D3FD4)   // vivid violet centre
+val HeroGlowMid       = Color(0xFF3B1F7A)   // mid-purple ring
+val HeroGlowEdge      = Color(0xFF1A1040)   // soft fade to background
+
 // ── Legacy (kept so existing un-redesigned screens still compile) ─────────────
 val LegacyDarkTeal    = Color(0xFF1A1235)   // was dark teal, now deep violet
 val LegacyOrange      = Color(0xFFF472B6)   // tertiary pink accent (from Electric Violet palette)
