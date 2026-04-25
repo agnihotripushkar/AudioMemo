@@ -45,12 +45,7 @@ import com.example.audiomemo.BuildConfig
 import com.example.audiomemo.R
 import com.example.audiomemo.features.home.ui.HomeBottomNavBar
 import com.example.audiomemo.features.home.ui.HomeTab
-import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
-import com.example.audiomemo.ui.theme.DividerColor
-import com.example.audiomemo.ui.theme.NavyElevated
-import com.example.audiomemo.ui.theme.TextSecondary
-import com.example.audiomemo.ui.theme.TextTertiary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,7 +132,7 @@ fun SettingsScreen(
                         }
                     )
                     HorizontalDivider(
-                        color = DividerColor,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         modifier = Modifier.padding(start = 52.dp)
                     )
                     SettingsRow(
@@ -153,7 +148,7 @@ fun SettingsScreen(
                         }
                     )
                     HorizontalDivider(
-                        color = DividerColor,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         modifier = Modifier.padding(start = 52.dp)
                     )
                     SettingsRow(
@@ -175,7 +170,7 @@ private fun SettingsSectionHeader(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
-        color = TextTertiary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
@@ -188,7 +183,7 @@ private fun SettingsGroup(content: @Composable () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                color = NavyElevated,
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp)
             )
     ) {
@@ -216,7 +211,7 @@ private fun SettingsRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = AccentGreen,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.width(14.dp))
@@ -230,13 +225,13 @@ private fun SettingsRow(
             Text(
                 text = trailingText,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else if (onClick != null) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = TextTertiary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
         }

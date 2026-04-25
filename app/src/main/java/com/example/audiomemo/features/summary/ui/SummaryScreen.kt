@@ -56,7 +56,6 @@ import com.example.audiomemo.R
 import com.example.audiomemo.features.summary.domain.model.Summary
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.summary.ui.state.SummaryUiState
-import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -102,7 +101,7 @@ private fun LoadingContent() {
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             CircularProgressIndicator(
-                color = AccentGreen,
+                color = MaterialTheme.colorScheme.primary,
                 strokeWidth = 3.dp,
                 modifier = Modifier.size(48.dp)
             )
@@ -159,7 +158,7 @@ private fun FailedContent(
             Button(
                 onClick = onRetry,
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
                 Text(
@@ -365,14 +364,14 @@ private fun SectionCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = AccentGreen.copy(alpha = 0.15f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                     modifier = Modifier.size(32.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = AccentGreen,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -406,7 +405,7 @@ private fun BulletRow(text: String) {
             modifier = Modifier
                 .padding(top = 7.dp)
                 .size(6.dp)
-                .background(AccentGreen, CircleShape)
+                .background(MaterialTheme.colorScheme.primary, CircleShape)
         )
         Text(
             text = text,
@@ -426,7 +425,7 @@ private fun ChecklistRow(text: String) {
         Icon(
             imageVector = Icons.Default.RadioButtonUnchecked,
             contentDescription = null,
-            tint = AccentGreen,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .size(20.dp)
                 .padding(top = 2.dp)
@@ -479,7 +478,7 @@ private fun SummaryBottomBar(
             Button(
                 onClick = onDone,
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 modifier = Modifier
                     .weight(1f)
                     .height(52.dp)

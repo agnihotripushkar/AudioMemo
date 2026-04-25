@@ -47,7 +47,6 @@ import com.example.audiomemo.features.home.ui.HomeTab
 import com.example.audiomemo.features.meetings.ui.state.MeetingsDashboardUiState
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.transcript.domain.model.SessionState
-import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
 import com.example.audiomemo.ui.theme.NavyCard
 import com.example.audiomemo.ui.theme.NavyElevated
@@ -117,7 +116,7 @@ private fun MeetingsDashboardContent(
                         .padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = AccentGreen)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -207,7 +206,7 @@ private fun MeetingCard(
                     text = formatDay(item.startTime),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = formatMonth(item.startTime),
@@ -266,7 +265,7 @@ private fun SummaryStatusBadge(status: SummaryStatus?) {
         SummaryStatus.GENERATING, SummaryStatus.PENDING -> Icon(
             imageVector = Icons.Default.HourglassEmpty,
             contentDescription = stringResource(R.string.meetings_cd_generating),
-            tint = AccentGreen,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp)
         )
         else -> Unit

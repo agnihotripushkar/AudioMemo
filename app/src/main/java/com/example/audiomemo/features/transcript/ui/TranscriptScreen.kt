@@ -79,7 +79,6 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.audiomemo.features.transcript.service.AudioRecordingService
 import com.example.audiomemo.features.transcript.ui.state.TranscriptUiState
-import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
 import com.example.audiomemo.ui.theme.RecordingRed
 import kotlinx.coroutines.delay
@@ -404,7 +403,7 @@ private fun TranscriptTabRow(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) AccentGreen else MaterialTheme.colorScheme.outline,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )
                 Spacer(Modifier.height(6.dp))
@@ -413,7 +412,7 @@ private fun TranscriptTabRow(
                         .fillMaxWidth(0.6f)
                         .height(2.dp)
                         .background(
-                            if (isSelected) AccentGreen else Color.Transparent,
+                            if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                             RoundedCornerShape(1.dp)
                         )
                 )
@@ -498,14 +497,14 @@ private fun TranscriptWaitingState() {
         ) {
             Surface(
                 shape = CircleShape,
-                color = AccentGreen.copy(alpha = 0.15f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 modifier = Modifier.size(64.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.GraphicEq,
                         contentDescription = null,
-                        tint = AccentGreen,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -566,7 +565,7 @@ private fun TranscriptPostRecordingContent(uiState: TranscriptUiState.PostRecord
 private fun TranscriptionStatusBanner(isComplete: Boolean) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = if (isComplete) AccentGreen.copy(alpha = 0.12f)
+        color = if (isComplete) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 else MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -579,20 +578,20 @@ private fun TranscriptionStatusBanner(isComplete: Boolean) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
-                    color = AccentGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
-                        .background(AccentGreen, CircleShape)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
                 )
             }
             Text(
                 text = if (isComplete) stringResource(R.string.transcript_transcription_complete)
                    else stringResource(R.string.transcript_transcribing),
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isComplete) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (isComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -653,7 +652,7 @@ private fun RecordingBottomBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    WaveformBars(amplitude = amplitude, barColor = AccentGreen)
+                    WaveformBars(amplitude = amplitude, barColor = MaterialTheme.colorScheme.primary)
                     Text(
                         text = formatTime(elapsedSeconds),
                         style = MaterialTheme.typography.titleMedium,
@@ -721,7 +720,7 @@ private fun PostRecordingBottomBar(
         Button(
             onClick = { if (sessionId > 0L) onViewSummary(sessionId) },
             shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentGreen),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             enabled = sessionId > 0L,
             modifier = Modifier
                 .weight(1f)

@@ -2,6 +2,7 @@ package com.example.audiomemo.features.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.audiomemo.core.preferences.AccentColor
 import com.example.audiomemo.core.preferences.AppFont
 import com.example.audiomemo.core.preferences.AppPreferencesRepository
 import com.example.audiomemo.core.preferences.ThemeMode
@@ -29,11 +30,21 @@ class AppearanceViewModel @Inject constructor(
         initialValue = AppFont.DEFAULT
     )
 
+    val accentColor: StateFlow<AccentColor> = repo.accentColor.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = AccentColor.VIOLET
+    )
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { repo.setThemeMode(mode) }
     }
 
     fun setAppFont(font: AppFont) {
         viewModelScope.launch { repo.setAppFont(font) }
+    }
+
+    fun setAccentColor(color: AccentColor) {
+        viewModelScope.launch { repo.setAccentColor(color) }
     }
 }

@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.audiomemo.core.preferences.AccentColor
 import com.example.audiomemo.core.preferences.ThemeMode
 import com.example.audiomemo.features.home.ui.HomeScreen
 import com.example.audiomemo.features.meetings.ui.MeetingDetailsScreen
@@ -46,6 +47,7 @@ private fun AudioMemoApp(
 ) {
     val themeMode by appearanceViewModel.themeMode.collectAsStateWithLifecycle()
     val appFont by appearanceViewModel.appFont.collectAsStateWithLifecycle()
+    val accentColor by appearanceViewModel.accentColor.collectAsStateWithLifecycle()
 
     val isDark = when (themeMode) {
         ThemeMode.DARK -> true
@@ -55,7 +57,8 @@ private fun AudioMemoApp(
 
     AudioMemoTheme(
         darkTheme = isDark,
-        fontFamily = appFont.toFontFamily()
+        fontFamily = appFont.toFontFamily(),
+        accentColor = accentColor
     ) {
         Surface(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()

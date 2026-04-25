@@ -83,13 +83,7 @@ import com.example.audiomemo.R
 import com.example.audiomemo.features.meetings.ui.MeetingListItem
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.transcript.domain.model.SessionState
-import com.example.audiomemo.ui.theme.AccentGreen
-import com.example.audiomemo.ui.theme.AccentGreenDark
-import com.example.audiomemo.ui.theme.AccentGreenLight
 import com.example.audiomemo.ui.theme.AudioMemoTheme
-import com.example.audiomemo.ui.theme.HeroGlowCore
-import com.example.audiomemo.ui.theme.HeroGlowEdge
-import com.example.audiomemo.ui.theme.HeroGlowMid
 import com.example.audiomemo.ui.theme.RecordingRed
 import com.example.audiomemo.ui.theme.TextPrimary
 import java.text.SimpleDateFormat
@@ -327,6 +321,9 @@ private fun RecordButtonSection(
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val sectionHeightPx = with(density) { 320.dp.toPx() }
     val bgColor = MaterialTheme.colorScheme.background
+    val primary = MaterialTheme.colorScheme.primary
+    val primaryLight = MaterialTheme.colorScheme.onPrimaryContainer
+    val primaryDark = MaterialTheme.colorScheme.secondary
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -335,9 +332,9 @@ private fun RecordButtonSection(
             .background(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        HeroGlowCore,
-                        HeroGlowMid.copy(alpha = 0.8f),
-                        HeroGlowEdge.copy(alpha = 0.5f),
+                        primary.copy(alpha = 0.55f),
+                        primaryDark.copy(alpha = 0.30f),
+                        primary.copy(alpha = 0.08f),
                         bgColor.copy(alpha = 0f)
                     ),
                     center = Offset(
@@ -359,9 +356,9 @@ private fun RecordButtonSection(
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                AccentGreenLight,   // #A78BFA — lighter center
-                                AccentGreen,        // #8B5CF6 — mid
-                                AccentGreenDark,    // #7C3AED — darker edge
+                                primaryLight,
+                                primary,
+                                primaryDark,
                             )
                         )
                     )
@@ -418,14 +415,14 @@ private fun RecordingCard(
             // Mic icon badge
             Surface(
                 shape = CircleShape,
-                color = AccentGreen.copy(alpha = 0.15f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 modifier = Modifier.size(42.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.GraphicEq,
                         contentDescription = null,
-                        tint = AccentGreen,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -481,7 +478,7 @@ private fun RecordingCard(
 @Composable
 private fun SummaryStatusBadge(status: SummaryStatus?) {
     val (labelRes, color) = when (status) {
-        SummaryStatus.DONE -> R.string.home_status_summarized to AccentGreen
+        SummaryStatus.DONE -> R.string.home_status_summarized to MaterialTheme.colorScheme.primary
         SummaryStatus.GENERATING -> R.string.home_status_processing to MaterialTheme.colorScheme.tertiary
         SummaryStatus.FAILED -> R.string.home_status_failed to MaterialTheme.colorScheme.error
         else -> return
@@ -582,11 +579,11 @@ fun HomeBottomNavBar(
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = AccentGreen,
-                    selectedTextColor = AccentGreen,
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
                     unselectedIconColor = MaterialTheme.colorScheme.outline,
                     unselectedTextColor = MaterialTheme.colorScheme.outline,
-                    indicatorColor = AccentGreen.copy(alpha = 0.12f)
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 )
             )
         }

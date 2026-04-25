@@ -48,7 +48,6 @@ import com.example.audiomemo.features.meetings.ui.state.MeetingDetailsUiState
 import com.example.audiomemo.features.summary.domain.model.Summary
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.transcript.domain.model.Transcript
-import com.example.audiomemo.ui.theme.AccentGreen
 import com.example.audiomemo.ui.theme.AudioMemoTheme
 import com.example.audiomemo.ui.theme.DividerColor
 import com.example.audiomemo.ui.theme.NavyElevated
@@ -138,7 +137,7 @@ private fun MeetingDetailsContent(
                         .padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = AccentGreen)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
             is MeetingDetailsUiState.Success -> {
@@ -170,12 +169,12 @@ private fun MeetingDetailsSuccess(
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = AccentGreen,
+                contentColor = MaterialTheme.colorScheme.primary,
                 edgePadding = 16.dp,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = AccentGreen
+                        color = MaterialTheme.colorScheme.primary
                     )
                 },
                 divider = { HorizontalDivider(color = DividerColor) }
@@ -189,7 +188,7 @@ private fun MeetingDetailsSuccess(
                                 text = title,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = if (selectedTab == index) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selectedTab == index) AccentGreen
+                                color = if (selectedTab == index) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -260,7 +259,7 @@ private fun SummaryTab(summary: Summary) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(36.dp), color = AccentGreen)
+                CircularProgressIndicator(modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary)
                 Text(
                     text = stringResource(R.string.meeting_details_generating_summary),
                     style = MaterialTheme.typography.bodyMedium,
@@ -319,7 +318,7 @@ private fun SummarySection(title: String, body: String) {
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium,
-            color = AccentGreen,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.height(6.dp))
