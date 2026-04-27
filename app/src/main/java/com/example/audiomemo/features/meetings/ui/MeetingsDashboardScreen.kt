@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.audiomemo.features.home.ui.SwipeToDeleteWrapper
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -71,7 +72,8 @@ fun MeetingsDashboardScreen(
         uiState = uiState,
         onNavigateToHome = onNavigateToHome,
         onNavigateToSettings = onNavigateToSettings,
-        onMeetingClick = onMeetingClick
+        onMeetingClick = onMeetingClick,
+        onDeleteMeeting = { viewModel.deleteSession(it) }
     )
 }
 
@@ -81,7 +83,8 @@ private fun MeetingsDashboardContent(
     uiState: MeetingsDashboardUiState,
     onNavigateToHome: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onMeetingClick: (Long) -> Unit
+    onMeetingClick: (Long) -> Unit,
+    onDeleteMeeting: (Long) -> Unit = {}
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -133,10 +136,15 @@ private fun MeetingsDashboardContent(
                     ) {
                         item { Spacer(modifier = Modifier.height(4.dp)) }
                         items(uiState.meetings, key = { it.sessionId }) { meeting ->
-                            MeetingCard(
-                                item = meeting,
-                                onClick = { onMeetingClick(meeting.sessionId) }
-                            )
+                            SwipeToDeleteWrapper(
+                                onDelete = { onDeleteMeeting(meeting.sessionId) },
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                MeetingCard(
+                                    item = meeting,
+                                    onClick = { onMeetingClick(meeting.sessionId) }
+                                )
+                            }
                         }
                         item { Spacer(modifier = Modifier.height(8.dp)) }
                     }

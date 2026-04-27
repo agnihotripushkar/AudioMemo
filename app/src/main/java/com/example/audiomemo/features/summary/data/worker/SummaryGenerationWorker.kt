@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.audiomemo.BuildConfig
+import com.example.audiomemo.data.db.dao.ChunkDao
 import com.example.audiomemo.data.db.dao.SummaryDao
 import com.example.audiomemo.data.db.dao.TranscriptDao
 import com.example.audiomemo.data.db.entities.SummaryEntity
@@ -13,6 +14,7 @@ import com.example.audiomemo.data.network.models.ChatCompletionRequest
 import com.example.audiomemo.data.network.models.ChatMessage
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.transcript.data.mapper.toDomain
+import com.example.audiomemo.features.transcript.domain.model.ChunkStatus
 import com.example.audiomemo.features.transcript.util.TranscriptStitcher
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -27,6 +29,7 @@ interface SummaryGenerationEntryPoint {
     fun transcriptDao(): TranscriptDao
     fun summaryDao(): SummaryDao
     fun openAIApiService(): OpenAIApiService
+    fun chunkDao(): ChunkDao
 }
 
 /**
@@ -59,6 +62,14 @@ class SummaryGenerationWorker(
         val transcriptDao = ep.transcriptDao()
         val summaryDao = ep.summaryDao()
         val apiService = ep.openAIApiService()
+        val chunkDao = ep.chunkDao()
+
+        // Retry if uploads are still in progress so we have a complete transcript
+        val chunks = chunkDao.getChunksForSessionOnce(sessionId)
+        val uploadsInProgress = chunks.any {
+            it.status == ChunkStatus.PENDING || it.status == ChunkStatus.UPLOADING
+        }
+        if (uploadsInProgress && runAttemptCount < 4) return Result.retry()
 
         val transcripts = transcriptDao.getTranscriptsForSession(sessionId).first()
             .map { it.toDomain() }

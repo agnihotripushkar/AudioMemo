@@ -38,7 +38,7 @@ class AudioRecorderManager(private val context: Context) {
     var isRecording: Boolean = false
         private set
 
-    /** Called whenever a 30-second chunk is completed (rotation or pause/stop). */
+    /** Called whenever a 15-second chunk is completed (rotation or pause/stop). */
     var onChunkCompleted: ((File) -> Unit)? = null
 
     /** Called when storage drops below the minimum threshold during recording. */
@@ -98,7 +98,7 @@ class AudioRecorderManager(private val context: Context) {
         }
         chunkJob = scope.launch {
             while (isActive) {
-                delay(30_000)
+                delay(15_000)
                 if (!isActive) break
                 if (!StorageGuard.hasEnoughStorage(context.filesDir)) {
                     onStorageLow?.invoke()

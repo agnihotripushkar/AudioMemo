@@ -83,6 +83,7 @@ import com.example.audiomemo.ui.theme.AudioMemoTheme
 import com.example.audiomemo.ui.theme.RecordingRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -161,6 +162,12 @@ fun TranscriptScreen(
         .collectAsState(initial = 0)
     val serviceIsStopped by (recordingService?.isStopped ?: MutableStateFlow(false))
         .collectAsState(initial = false)
+
+    LaunchedEffect(recordingService) {
+        val service = recordingService ?: return@LaunchedEffect
+        val sessionId = service.currentSessionIdFlow.first { it > 0L }
+        viewModel.onSessionStarted(sessionId)
+    }
 
     LaunchedEffect(serviceIsStopped) {
         if (serviceIsStopped) {
@@ -482,7 +489,10 @@ private fun NotesTab(isRecording: Boolean) {
 @Composable
 private fun TranscriptTab(uiState: TranscriptUiState) {
     when (uiState) {
-        is TranscriptUiState.Recording -> TranscriptWaitingState()
+        is TranscriptUiState.Recording -> {
+            if (uiState.liveTranscript.isBlank()) TranscriptWaitingState()
+            else TranscriptLiveContent(uiState.liveTranscript)
+        }
         is TranscriptUiState.PostRecording -> TranscriptPostRecordingContent(uiState)
     }
 }
@@ -521,6 +531,48 @@ private fun TranscriptWaitingState() {
                 textAlign = TextAlign.Center
             )
         }
+    }
+}
+
+@Composable
+private fun TranscriptLiveContent(transcript: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = stringResource(R.string.transcript_transcribing),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = transcript,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        )
     }
 }
 
@@ -777,7 +829,7 @@ private fun formatTime(seconds: Int): String {
 fun TranscriptRecordingPreview() {
     AudioMemoTheme {
         TranscriptContent(
-            uiState = TranscriptUiState.Recording,
+            uiState = TranscriptUiState.Recording(),
             isRecording = true,
             postState = null,
             amplitude = 8000,

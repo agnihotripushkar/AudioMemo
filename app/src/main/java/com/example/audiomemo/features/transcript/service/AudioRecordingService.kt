@@ -75,6 +75,9 @@ class AudioRecordingService : Service() {
     private val _isStopped = MutableStateFlow(false)
     val isStopped: StateFlow<Boolean> = _isStopped.asStateFlow()
 
+    private val _currentSessionId = MutableStateFlow(-1L)
+    val currentSessionIdFlow: StateFlow<Long> = _currentSessionId.asStateFlow()
+
     val amplitude: StateFlow<Int> get() = recorder.amplitude
     val lastChunkFile: StateFlow<File?> get() = recorder.lastChunkFile
     val currentSessionId: Long
@@ -103,7 +106,12 @@ class AudioRecordingService : Service() {
         sessionStateManager = SessionStateManager(sessionDao, chunkDao)
 
         recorder.onChunkCompleted = { file ->
-            lastChunkSaveJob = serviceScope.launch { sessionStateManager.saveChunk(file.absolutePath) }
+            lastChunkSaveJob = serviceScope.launch {
+                val chunkId = sessionStateManager.saveChunk(file.absolutePath)
+                if (chunkId > 0L) {
+                    enqueueChunkUpload(chunkId, sessionStateManager.currentSessionId)
+                }
+            }
         }
         recorder.onStorageLow = { handleLowStorage() }
         recorder.onHardwareError = { handleHardwareError() }
@@ -164,6 +172,7 @@ class AudioRecordingService : Service() {
 
         serviceScope.launch {
             val sessionId = sessionStateManager.startSession()
+            _currentSessionId.value = sessionId
             enqueueFinalizationWorker(sessionId)
         }
 
@@ -194,6 +203,7 @@ class AudioRecordingService : Service() {
     // ── Interruption handlers ──────────────────────────────────────────────────
 
     private fun handleInterruptionPause(reason: AudioInterruptionManager.PauseReason) {
+        if (_isStopped.value) return
         recorder.pauseRecording()
         silenceDetector.stop()
         serviceScope.launch { sessionStateManager.pauseSession() }
@@ -216,6 +226,7 @@ class AudioRecordingService : Service() {
     }
 
     private fun handleInterruptionResume() {
+        if (_isStopped.value) return
         // If the user has manually paused via headset button, keep the recorder paused
         // and show the media-button pause notification instead of resuming.
         if (isMediaButtonPaused) {
@@ -276,6 +287,7 @@ class AudioRecordingService : Service() {
     }
 
     private fun handleSourceChanged(sourceName: String) {
+        if (_isStopped.value) return
         NotificationHelper.updateNotification(
             this,
             NotificationHelper.buildMicSourceChangedNotification(this, sourceName, stopPendingIntent())
@@ -294,6 +306,7 @@ class AudioRecordingService : Service() {
     }
 
     private fun handleSilenceDetected() {
+        if (_isStopped.value) return
         NotificationHelper.updateNotification(
             this,
             NotificationHelper.buildSilenceWarningNotification(this, stopPendingIntent())
@@ -393,6 +406,9 @@ class AudioRecordingService : Service() {
 
     /** Normal stop via user action (Stop button or ACTION_STOP intent). */
     private fun stopRecordingCleanly() {
+        if (_isStopped.value) return
+        _isStopped.value = true
+        stopForeground(STOP_FOREGROUND_REMOVE)
         recorder.stopRecording()
         silenceDetector.stop()
         interruptionManager.stop()
@@ -406,8 +422,6 @@ class AudioRecordingService : Service() {
             cancelFinalizationWorker(sessionId)
             enqueueTranscriptionChain(sessionId)
         }
-        _isStopped.value = true
-        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
@@ -435,40 +449,41 @@ class AudioRecordingService : Service() {
             .cancelUniqueWork("${ChunkFinalizationWorker.WORK_NAME_PREFIX}$sessionId")
     }
 
+    private fun enqueueChunkUpload(chunkId: Long, sessionId: Long) {
+        if (chunkId <= 0L || sessionId <= 0L) return
+        val constraints = UploadPreferences.networkConstraints(applicationContext)
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "${WhisperUploadWorker.WORK_NAME_PREFIX}$chunkId",
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<WhisperUploadWorker>()
+                .setConstraints(constraints)
+                .setInputData(
+                    workDataOf(
+                        WhisperUploadWorker.KEY_CHUNK_ID to chunkId,
+                        WhisperUploadWorker.KEY_SESSION_ID to sessionId
+                    )
+                )
+                .build()
+        )
+    }
+
     private suspend fun enqueueTranscriptionChain(sessionId: Long) {
         if (sessionId <= 0L) return
 
+        // Upload any chunks that weren't already enqueued (e.g. last chunk before stop)
         val pendingChunks = chunkDao.getChunksForSessionOnce(sessionId)
             .filter { it.status == ChunkStatus.PENDING }
+        pendingChunks.forEach { chunk -> enqueueChunkUpload(chunk.id, chunk.sessionId) }
 
-        val summaryRequest = OneTimeWorkRequestBuilder<SummaryGenerationWorker>()
-            .setInputData(workDataOf(SummaryGenerationWorker.KEY_SESSION_ID to sessionId))
-            .addTag("${SummaryGenerationWorker.WORK_NAME_PREFIX}$sessionId")
-            .build()
-
-        if (pendingChunks.isEmpty()) {
-            WorkManager.getInstance(applicationContext).enqueue(summaryRequest)
-            return
-        }
-
-        val uploadConstraints: Constraints = UploadPreferences.networkConstraints(applicationContext)
-
-        val uploadRequests = pendingChunks.map { chunk ->
-            OneTimeWorkRequestBuilder<WhisperUploadWorker>()
-                .setConstraints(uploadConstraints)
-                .setInputData(
-                    workDataOf(
-                        WhisperUploadWorker.KEY_CHUNK_ID to chunk.id,
-                        WhisperUploadWorker.KEY_SESSION_ID to chunk.sessionId
-                    )
-                )
-                .addTag("${WhisperUploadWorker.WORK_NAME_PREFIX}${chunk.id}")
+        // Enqueue summary independently with a delay so uploads can complete.
+        // SummaryGenerationWorker will retry if uploads are still in progress.
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "${SummaryGenerationWorker.WORK_NAME_PREFIX}$sessionId",
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<SummaryGenerationWorker>()
+                .setInputData(workDataOf(SummaryGenerationWorker.KEY_SESSION_ID to sessionId))
+                .setInitialDelay(20, TimeUnit.SECONDS)
                 .build()
-        }
-
-        WorkManager.getInstance(applicationContext)
-            .beginWith(uploadRequests)
-            .then(summaryRequest)
-            .enqueue()
+        )
     }
 }

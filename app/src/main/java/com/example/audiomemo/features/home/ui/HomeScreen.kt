@@ -39,8 +39,11 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +51,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -119,6 +125,7 @@ fun HomeScreen(
         onNavigateToMeetings = onNavigateToMeetings,
         onNavigateToSettings = onNavigateToSettings,
         onMeetingClick = onNavigateToMeetingDetails,
+        onDeleteMeeting = { viewModel.deleteSession(it) },
         onCaptureClick = {
             val hasAudio = ContextCompat.checkSelfPermission(
                 context, Manifest.permission.RECORD_AUDIO
@@ -147,6 +154,7 @@ fun HomeContent(
     onNavigateToMeetings: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
     onMeetingClick: (Long) -> Unit,
+    onDeleteMeeting: (Long) -> Unit = {},
     onCaptureClick: () -> Unit
 ) {
     Scaffold(
@@ -221,10 +229,15 @@ fun HomeContent(
                 item { EmptyRecordingsState() }
             } else {
                 items(recentMeetings, key = { it.sessionId }) { meeting ->
-                    RecordingCard(
-                        meeting = meeting,
-                        onClick = { onMeetingClick(meeting.sessionId) }
-                    )
+                    SwipeToDeleteWrapper(
+                        onDelete = { onDeleteMeeting(meeting.sessionId) },
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        RecordingCard(
+                            meeting = meeting,
+                            onClick = { onMeetingClick(meeting.sessionId) }
+                        )
+                    }
                 }
             }
 
@@ -531,6 +544,51 @@ private fun EmptyRecordingsState() {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
         )
+    }
+}
+
+// ── Swipe-to-delete wrapper ───────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToDeleteWrapper(
+    onDelete: () -> Unit,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(14.dp),
+    content: @Composable () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) { onDelete(); true } else false
+        }
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            val bgColor by animateColorAsState(
+                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart)
+                    MaterialTheme.colorScheme.errorContainer
+                else
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0f),
+                label = "swipeDeleteBg"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(bgColor)
+                    .padding(end = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete recording",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    ) {
+        content()
     }
 }
 

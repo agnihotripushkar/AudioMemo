@@ -29,6 +29,10 @@ class TranscriptViewModel @Inject constructor(
     private val _isRecording = MutableStateFlow(true)
     private val _sessionId = MutableStateFlow(-1L)
 
+    fun onSessionStarted(sessionId: Long) {
+        if (sessionId > 0L) _sessionId.value = sessionId
+    }
+
     fun onRecordingStopped(sessionId: Long) {
         if (sessionId > 0L) _sessionId.value = sessionId
         _isRecording.value = false
@@ -60,7 +64,7 @@ class TranscriptViewModel @Inject constructor(
         isTranscriptionComplete
     ) { isRecording, transcript, complete ->
         if (isRecording) {
-            TranscriptUiState.Recording
+            TranscriptUiState.Recording(liveTranscript = transcript)
         } else {
             TranscriptUiState.PostRecording(
                 sessionId = _sessionId.value,
@@ -68,5 +72,5 @@ class TranscriptViewModel @Inject constructor(
                 isTranscriptionComplete = complete
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TranscriptUiState.Recording)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TranscriptUiState.Recording())
 }
