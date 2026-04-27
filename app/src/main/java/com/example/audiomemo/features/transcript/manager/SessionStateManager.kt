@@ -49,7 +49,7 @@ class SessionStateManager(
         if (currentSessionId > 0) sessionDao.updateState(currentSessionId, SessionState.STOPPED)
     }
 
-    suspend fun saveChunk(filePath: String) = withContext(Dispatchers.IO) {
+    suspend fun saveChunk(filePath: String): Long = withContext(Dispatchers.IO) {
         if (currentSessionId > 0) {
             chunkDao.insert(
                 ChunkEntity(
@@ -59,6 +59,6 @@ class SessionStateManager(
                     status = ChunkStatus.PENDING
                 )
             )
-        }
+        } else -1L
     }
 }
