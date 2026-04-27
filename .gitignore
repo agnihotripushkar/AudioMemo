@@ -64,3 +64,6 @@ obj/
 
 # Mac OS X
 .DS_Store
+
+# Kiro
+.kiro/

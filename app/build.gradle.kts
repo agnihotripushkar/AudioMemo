@@ -62,6 +62,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
@@ -118,6 +123,9 @@ dependencies {
     debugImplementation(libs.okhttp.logging.interceptor)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotest.property)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.work.testing)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

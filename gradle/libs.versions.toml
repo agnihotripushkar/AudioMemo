@@ -23,6 +23,7 @@ lifecycleRuntimeCompose = "2.8.0"
 coil = "2.7.0"
 coreSplashscreen = "1.0.1"
 datastore = "1.1.1"
+kotest = "5.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -72,6 +73,13 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 
 # DataStore
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+
+# Kotest property-based testing
+kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
+kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+
+# WorkManager testing
+work-testing = { module = "androidx.work:work-testing", version.ref = "workManager" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
