@@ -83,7 +83,6 @@ import com.example.audiomemo.ui.theme.AudioMemoTheme
 import com.example.audiomemo.ui.theme.RecordingRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -163,6 +162,8 @@ fun TranscriptScreen(
     val serviceIsStopped by (recordingService?.isStopped ?: MutableStateFlow(false))
         .collectAsState(initial = false)
 
+    // When the service connects, wait for the first valid session ID and forward it
+    // to the ViewModel so the live-transcript Flow starts querying the right session.
     LaunchedEffect(recordingService) {
         val service = recordingService ?: return@LaunchedEffect
         val sessionId = service.currentSessionIdFlow.first { it > 0L }
@@ -490,8 +491,11 @@ private fun NotesTab(isRecording: Boolean) {
 private fun TranscriptTab(uiState: TranscriptUiState) {
     when (uiState) {
         is TranscriptUiState.Recording -> {
-            if (uiState.liveTranscript.isBlank()) TranscriptWaitingState()
-            else TranscriptLiveContent(uiState.liveTranscript)
+            if (uiState.liveTranscript.isBlank()) {
+                TranscriptWaitingState()
+            } else {
+                TranscriptLiveContent(uiState.liveTranscript)
+            }
         }
         is TranscriptUiState.PostRecording -> TranscriptPostRecordingContent(uiState)
     }
@@ -551,13 +555,9 @@ private fun TranscriptLiveContent(transcript: String) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                RecordingDot()
                 Text(
-                    text = stringResource(R.string.transcript_transcribing),
+                    text = stringResource(R.string.transcript_live_title),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )

@@ -5,7 +5,6 @@ import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
-import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -108,8 +107,9 @@ class AudioRecordingService : Service() {
         recorder.onChunkCompleted = { file ->
             lastChunkSaveJob = serviceScope.launch {
                 val chunkId = sessionStateManager.saveChunk(file.absolutePath)
-                if (chunkId > 0L) {
-                    enqueueChunkUpload(chunkId, sessionStateManager.currentSessionId)
+                val sessionId = sessionStateManager.currentSessionId
+                if (chunkId > 0L && sessionId > 0L) {
+                    enqueueChunkUpload(chunkId, sessionId)
                 }
             }
         }
@@ -470,7 +470,8 @@ class AudioRecordingService : Service() {
     private suspend fun enqueueTranscriptionChain(sessionId: Long) {
         if (sessionId <= 0L) return
 
-        // Upload any chunks that weren't already enqueued (e.g. last chunk before stop)
+        // Enqueue any remaining PENDING chunks that weren't already uploaded live.
+        // KEEP policy ensures we don't create duplicate workers for chunks already in flight.
         val pendingChunks = chunkDao.getChunksForSessionOnce(sessionId)
             .filter { it.status == ChunkStatus.PENDING }
         pendingChunks.forEach { chunk -> enqueueChunkUpload(chunk.id, chunk.sessionId) }
@@ -483,6 +484,7 @@ class AudioRecordingService : Service() {
             OneTimeWorkRequestBuilder<SummaryGenerationWorker>()
                 .setInputData(workDataOf(SummaryGenerationWorker.KEY_SESSION_ID to sessionId))
                 .setInitialDelay(20, TimeUnit.SECONDS)
+                .addTag("${SummaryGenerationWorker.WORK_NAME_PREFIX}$sessionId")
                 .build()
         )
     }

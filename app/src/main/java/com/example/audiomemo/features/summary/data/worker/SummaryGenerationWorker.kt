@@ -12,6 +12,7 @@ import com.example.audiomemo.data.db.entities.SummaryEntity
 import com.example.audiomemo.data.network.OpenAIApiService
 import com.example.audiomemo.data.network.models.ChatCompletionRequest
 import com.example.audiomemo.data.network.models.ChatMessage
+import com.example.audiomemo.data.db.dao.ChunkDao
 import com.example.audiomemo.features.summary.domain.model.SummaryStatus
 import com.example.audiomemo.features.transcript.data.mapper.toDomain
 import com.example.audiomemo.features.transcript.domain.model.ChunkStatus
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.first
 interface SummaryGenerationEntryPoint {
     fun transcriptDao(): TranscriptDao
     fun summaryDao(): SummaryDao
+    fun chunkDao(): ChunkDao
     fun openAIApiService(): OpenAIApiService
     fun chunkDao(): ChunkDao
 }
@@ -61,10 +63,18 @@ class SummaryGenerationWorker(
         )
         val transcriptDao = ep.transcriptDao()
         val summaryDao = ep.summaryDao()
+        val chunkDao = ep.chunkDao()
         val apiService = ep.openAIApiService()
         val chunkDao = ep.chunkDao()
 
         // Retry if uploads are still in progress so we have a complete transcript
+        val chunks = chunkDao.getChunksForSessionOnce(sessionId)
+        val uploadsInProgress = chunks.any {
+            it.status == ChunkStatus.PENDING || it.status == ChunkStatus.UPLOADING
+        }
+        if (uploadsInProgress && runAttemptCount < 4) return Result.retry()
+
+        // Retry if any uploads are still in progress so the summary includes all chunks.
         val chunks = chunkDao.getChunksForSessionOnce(sessionId)
         val uploadsInProgress = chunks.any {
             it.status == ChunkStatus.PENDING || it.status == ChunkStatus.UPLOADING
