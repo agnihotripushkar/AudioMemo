@@ -75,6 +75,9 @@ class AudioRecordingService : Service() {
     private val _isStopped = MutableStateFlow(false)
     val isStopped: StateFlow<Boolean> = _isStopped.asStateFlow()
 
+    private val _currentSessionId = MutableStateFlow(-1L)
+    val currentSessionIdFlow: StateFlow<Long> = _currentSessionId.asStateFlow()
+
     val amplitude: StateFlow<Int> get() = recorder.amplitude
     val lastChunkFile: StateFlow<File?> get() = recorder.lastChunkFile
     val currentSessionId: Long
@@ -103,7 +106,13 @@ class AudioRecordingService : Service() {
         sessionStateManager = SessionStateManager(sessionDao, chunkDao)
 
         recorder.onChunkCompleted = { file ->
-            lastChunkSaveJob = serviceScope.launch { sessionStateManager.saveChunk(file.absolutePath) }
+            lastChunkSaveJob = serviceScope.launch {
+                val chunkId = sessionStateManager.saveChunk(file.absolutePath)
+                val sessionId = sessionStateManager.currentSessionId
+                if (chunkId > 0L && sessionId > 0L) {
+                    enqueueChunkUpload(chunkId, sessionId)
+                }
+            }
         }
         recorder.onStorageLow = { handleLowStorage() }
         recorder.onHardwareError = { handleHardwareError() }
@@ -164,6 +173,7 @@ class AudioRecordingService : Service() {
 
         serviceScope.launch {
             val sessionId = sessionStateManager.startSession()
+            _currentSessionId.value = sessionId
             enqueueFinalizationWorker(sessionId)
         }
 
@@ -413,6 +423,24 @@ class AudioRecordingService : Service() {
 
     // ── WorkManager helpers ────────────────────────────────────────────────────
 
+    private fun enqueueChunkUpload(chunkId: Long, sessionId: Long) {
+        val uploadConstraints: Constraints = UploadPreferences.networkConstraints(applicationContext)
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "${WhisperUploadWorker.WORK_NAME_PREFIX}$chunkId",
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<WhisperUploadWorker>()
+                .setConstraints(uploadConstraints)
+                .setInputData(
+                    workDataOf(
+                        WhisperUploadWorker.KEY_CHUNK_ID to chunkId,
+                        WhisperUploadWorker.KEY_SESSION_ID to sessionId
+                    )
+                )
+                .addTag("${WhisperUploadWorker.WORK_NAME_PREFIX}$chunkId")
+                .build()
+        )
+    }
+
     private fun enqueueFinalizationWorker(sessionId: Long) {
         if (sessionId <= 0L) return
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(
@@ -438,37 +466,21 @@ class AudioRecordingService : Service() {
     private suspend fun enqueueTranscriptionChain(sessionId: Long) {
         if (sessionId <= 0L) return
 
+        // Enqueue any remaining PENDING chunks that weren't already uploaded live.
+        // KEEP policy ensures we don't create duplicate workers for chunks already in flight.
         val pendingChunks = chunkDao.getChunksForSessionOnce(sessionId)
             .filter { it.status == ChunkStatus.PENDING }
 
-        val summaryRequest = OneTimeWorkRequestBuilder<SummaryGenerationWorker>()
-            .setInputData(workDataOf(SummaryGenerationWorker.KEY_SESSION_ID to sessionId))
-            .addTag("${SummaryGenerationWorker.WORK_NAME_PREFIX}$sessionId")
-            .build()
+        pendingChunks.forEach { chunk -> enqueueChunkUpload(chunk.id, chunk.sessionId) }
 
-        if (pendingChunks.isEmpty()) {
-            WorkManager.getInstance(applicationContext).enqueue(summaryRequest)
-            return
-        }
-
-        val uploadConstraints: Constraints = UploadPreferences.networkConstraints(applicationContext)
-
-        val uploadRequests = pendingChunks.map { chunk ->
-            OneTimeWorkRequestBuilder<WhisperUploadWorker>()
-                .setConstraints(uploadConstraints)
-                .setInputData(
-                    workDataOf(
-                        WhisperUploadWorker.KEY_CHUNK_ID to chunk.id,
-                        WhisperUploadWorker.KEY_SESSION_ID to chunk.sessionId
-                    )
-                )
-                .addTag("${WhisperUploadWorker.WORK_NAME_PREFIX}${chunk.id}")
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "${SummaryGenerationWorker.WORK_NAME_PREFIX}$sessionId",
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<SummaryGenerationWorker>()
+                .setInputData(workDataOf(SummaryGenerationWorker.KEY_SESSION_ID to sessionId))
+                .addTag("${SummaryGenerationWorker.WORK_NAME_PREFIX}$sessionId")
+                .setInitialDelay(5, TimeUnit.SECONDS)
                 .build()
-        }
-
-        WorkManager.getInstance(applicationContext)
-            .beginWith(uploadRequests)
-            .then(summaryRequest)
-            .enqueue()
+        )
     }
 }
